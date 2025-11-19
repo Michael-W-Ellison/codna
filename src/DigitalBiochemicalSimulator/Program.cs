@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using Spectre.Console;
 using DigitalBiochemicalSimulator.Core;
@@ -6,6 +7,7 @@ using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
 using DigitalBiochemicalSimulator.Visualization;
 using DigitalBiochemicalSimulator.Web;
+using DigitalBiochemicalSimulator.Grammar;
 
 namespace DigitalBiochemicalSimulator
 {
@@ -365,7 +367,7 @@ namespace DigitalBiochemicalSimulator
                 AnsiConsole.MarkupLine("[green]Simulation started![/]");
                 AnsiConsole.MarkupLine("[dim]Keyboard controls:[/]");
                 AnsiConsole.MarkupLine("[dim]  ↑/↓: Change layer | M: Toggle metrics | L: Toggle legend[/]");
-                AnsiConsole.MarkupLine("[dim]  P: Pause | S: Save | E: Export analytics | Q: Quit[/]");
+                AnsiConsole.MarkupLine("[dim]  P: Pause | A: Chain Analysis | S: Save | E: Export analytics | Q: Quit[/]");
                 Thread.Sleep(1000);
 
                 bool running = true;
@@ -412,6 +414,10 @@ namespace DigitalBiochemicalSimulator
                                 break;
                             case ConsoleKey.P:
                                 simulation.SetPaused(!simulation.TickManager.IsPaused);
+                                break;
+                            case ConsoleKey.A:
+                                // Display chain analysis
+                                DisplayChainAnalysis(simulation);
                                 break;
                             case ConsoleKey.S:
                                 // Save simulation
@@ -1163,6 +1169,116 @@ namespace DigitalBiochemicalSimulator
             {
                 AnsiConsole.MarkupLine($"[red]✗ Failed to load simulation: {ex.Message}[/]");
                 Thread.Sleep(3000);
+            }
+        }
+
+        /// <summary>
+        /// Displays comprehensive chain analysis results
+        /// </summary>
+        static void DisplayChainAnalysis(IntegratedSimulationEngine simulation)
+        {
+            AnsiConsole.Clear();
+            AnsiConsole.Write(
+                new FigletText("Chain Analysis")
+                    .Centered()
+                    .Color(Color.Cyan));
+
+            var analysis = simulation.GetLatestAnalysis();
+
+            if (analysis == null || analysis.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No chains available for analysis yet.[/]");
+                AnsiConsole.MarkupLine("[dim]Chain analysis runs every 50 ticks. Wait for more chains to form.[/]");
+                Thread.Sleep(3000);
+                return;
+            }
+
+            // Summary table
+            var summaryTable = new Table()
+                .BorderColor(Color.Green)
+                .Border(TableBorder.Rounded)
+                .AddColumn("[bold]Metric[/]")
+                .AddColumn("[bold]Value[/]");
+
+            var fullyValid = analysis.Count(a => a.IsFullyValid);
+            var grammarValid = analysis.Count(a => a.GrammarValid);
+            var semanticValid = analysis.Count(a => a.SemanticValid);
+            var astBuilt = analysis.Count(a => a.ASTBuilt);
+            var avgQuality = analysis.Any() ? analysis.Average(a => a.QualityScore) : 0;
+
+            summaryTable.AddRow("Total Chains Analyzed", analysis.Count.ToString());
+            summaryTable.AddRow("Fully Valid", $"{fullyValid} ({(double)fullyValid / analysis.Count * 100:F1}%)");
+            summaryTable.AddRow("Grammar Valid", $"{grammarValid} ({(double)grammarValid / analysis.Count * 100:F1}%)");
+            summaryTable.AddRow("Semantic Valid", $"{semanticValid} ({(double)semanticValid / analysis.Count * 100:F1}%)");
+            summaryTable.AddRow("AST Built", $"{astBuilt} ({(double)astBuilt / analysis.Count * 100:F1}%)");
+            summaryTable.AddRow("Average Quality", $"{avgQuality:F3}");
+
+            AnsiConsole.Write(new Panel(summaryTable)
+                .Header("[bold green]Analysis Summary[/]")
+                .Expand());
+
+            AnsiConsole.WriteLine();
+
+            // Top chains table
+            var topChains = analysis.Take(10).ToList();
+            var chainsTable = new Table()
+                .BorderColor(Color.Blue)
+                .Border(TableBorder.Rounded)
+                .AddColumn("[bold]ID[/]")
+                .AddColumn("[bold]Quality[/]")
+                .AddColumn("[bold]Grammar[/]")
+                .AddColumn("[bold]AST[/]")
+                .AddColumn("[bold]Semantic[/]")
+                .AddColumn("[bold]Code[/]");
+
+            foreach (var result in topChains)
+            {
+                var grammarMark = result.GrammarValid ? "[green]✓[/]" : "[red]✗[/]";
+                var astMark = result.ASTBuilt ? "[green]✓[/]" : "[red]✗[/]";
+                var semanticMark = result.SemanticValid ? "[green]✓[/]" : "[red]✗[/]";
+                var qualityColor = result.QualityScore >= 0.8 ? "green" : result.QualityScore >= 0.5 ? "yellow" : "red";
+                var codePreview = result.CodeString.Length > 40 ? result.CodeString.Substring(0, 37) + "..." : result.CodeString;
+
+                chainsTable.AddRow(
+                    result.ChainId.ToString(),
+                    $"[{qualityColor}]{result.QualityScore:F2}[/]",
+                    grammarMark,
+                    astMark,
+                    semanticMark,
+                    $"[dim]{codePreview}[/]"
+                );
+            }
+
+            AnsiConsole.Write(new Panel(chainsTable)
+                .Header("[bold blue]Top 10 Chains by Quality[/]")
+                .Expand());
+
+            // Detailed view option
+            AnsiConsole.WriteLine();
+            if (AnsiConsole.Confirm("[cyan]View detailed analysis for a specific chain?[/]", false))
+            {
+                var chainId = AnsiConsole.Ask<long>("[cyan]Enter Chain ID:[/]");
+                var selectedChain = analysis.FirstOrDefault(a => a.ChainId == chainId);
+
+                if (selectedChain != null)
+                {
+                    AnsiConsole.Clear();
+                    AnsiConsole.Write(new Rule($"[bold cyan]Chain {chainId} - Detailed Analysis[/]").RuleStyle("cyan"));
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.Write(new Panel(selectedChain.GetDetailedReport())
+                        .Header($"[bold cyan]Chain {chainId}[/]")
+                        .Border(TableBorder.Rounded)
+                        .BorderColor(Color.Cyan));
+
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[dim]Press any key to continue...[/]");
+                    Console.ReadKey(true);
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]Chain {chainId} not found in current analysis.[/]");
+                    Thread.Sleep(2000);
+                }
             }
         }
     }

@@ -56,6 +56,11 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Analytics System
         public AnalyticsEngine Analytics { get; private set; }
 
+        // Chain Analysis System
+        public ChainAnalyzer ChainAnalyzer { get; private set; }
+        private List<ComprehensiveAnalysisResult> _latestAnalysis;
+        private readonly object _analysisLock = new object();
+
         // State
         public List<Token> ActiveTokens { get; private set; }
         public bool IsRunning { get; private set; }
@@ -134,6 +139,10 @@ namespace DigitalBiochemicalSimulator.Simulation
 
             // Initialize analytics engine
             Analytics = new AnalyticsEngine();
+
+            // Initialize chain analyzer
+            ChainAnalyzer = new ChainAnalyzer();
+            _latestAnalysis = new List<ComprehensiveAnalysisResult>();
 
             // Update mutation zones
             Grid.UpdateMutationZone(Config.MutationRange);
@@ -415,6 +424,36 @@ namespace DigitalBiochemicalSimulator.Simulation
                 Statistics.CaptureSnapshot(currentTick);
                 Analytics.RecordSnapshot(this, currentTick);
             }
+
+            // Perform comprehensive chain analysis periodically (every 50 ticks)
+            if (currentTick % 50 == 0)
+            {
+                PerformChainAnalysis();
+            }
+        }
+
+        /// <summary>
+        /// Performs comprehensive AST and semantic analysis on all chains
+        /// </summary>
+        private void PerformChainAnalysis()
+        {
+            try
+            {
+                var allChains = ChainRegistry.GetAllChains();
+                if (allChains != null && allChains.Any())
+                {
+                    var results = ChainAnalyzer.AnalyzeMultipleChains(allChains);
+                    lock (_analysisLock)
+                    {
+                        _latestAnalysis = results;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silently fail to avoid disrupting simulation
+                System.Diagnostics.Debug.WriteLine($"Chain analysis failed: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -679,6 +718,44 @@ namespace DigitalBiochemicalSimulator.Simulation
         public DashboardData GetDashboardData()
         {
             return Analytics.GetDashboardData();
+        }
+
+        /// <summary>
+        /// Analyzes all current chains with comprehensive AST and semantic validation
+        /// </summary>
+        public List<ComprehensiveAnalysisResult> AnalyzeAllChains()
+        {
+            var allChains = ChainRegistry.GetAllChains();
+            return ChainAnalyzer.AnalyzeMultipleChains(allChains);
+        }
+
+        /// <summary>
+        /// Gets only fully valid chains (grammar + AST + semantics)
+        /// </summary>
+        public List<TokenChain> GetFullyValidChains()
+        {
+            var allChains = ChainRegistry.GetAllChains();
+            return ChainAnalyzer.GetFullyValidChains(allChains);
+        }
+
+        /// <summary>
+        /// Gets the best quality chains sorted by quality score
+        /// </summary>
+        public List<ComprehensiveAnalysisResult> GetBestQualityChains(int topN = 10)
+        {
+            var analysis = AnalyzeAllChains();
+            return analysis.Take(topN).ToList();
+        }
+
+        /// <summary>
+        /// Gets the latest cached analysis results (updated every 50 ticks)
+        /// </summary>
+        public List<ComprehensiveAnalysisResult> GetLatestAnalysis()
+        {
+            lock (_analysisLock)
+            {
+                return new List<ComprehensiveAnalysisResult>(_latestAnalysis);
+            }
         }
 
         public override string ToString()
