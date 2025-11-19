@@ -8,6 +8,7 @@ using DigitalBiochemicalSimulator.Chemistry;
 using DigitalBiochemicalSimulator.Grammar;
 using DigitalBiochemicalSimulator.Damage;
 using DigitalBiochemicalSimulator.Utilities;
+using DigitalBiochemicalSimulator.Analytics;
 
 namespace DigitalBiochemicalSimulator.Simulation
 {
@@ -51,6 +52,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Integration Systems (Phase 5)
         public CellProcessor CellProcessor { get; private set; }
         public SimulationStatistics Statistics { get; private set; }
+
+        // Analytics System
+        public AnalyticsEngine Analytics { get; private set; }
 
         // State
         public List<Token> ActiveTokens { get; private set; }
@@ -123,6 +127,9 @@ namespace DigitalBiochemicalSimulator.Simulation
 
             // Initialize statistics tracker (after ActiveTokens is initialized)
             Statistics = new SimulationStatistics(ActiveTokens, ChainRegistry, DamageSystem);
+
+            // Initialize analytics engine
+            Analytics = new AnalyticsEngine();
 
             // Update mutation zones
             Grid.UpdateMutationZone(Config.MutationRange);
@@ -402,6 +409,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (currentTick % 10 == 0)
             {
                 Statistics.CaptureSnapshot(currentTick);
+                Analytics.RecordSnapshot(this, currentTick);
             }
         }
 
@@ -422,6 +430,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             TickManager.Reset();
             ChainRegistry.Clear();
             Statistics.ClearHistory();
+            Analytics.Clear();
 
             // Reset counters
             TotalTokensGenerated = 0;
@@ -492,6 +501,30 @@ namespace DigitalBiochemicalSimulator.Simulation
         public string ExportStatisticsToCSV()
         {
             return Statistics.ExportToCSV();
+        }
+
+        /// <summary>
+        /// Exports comprehensive analytics to JSON
+        /// </summary>
+        public string ExportAnalyticsToJSON()
+        {
+            return Analytics.ExportToJSON();
+        }
+
+        /// <summary>
+        /// Exports comprehensive analytics to CSV
+        /// </summary>
+        public string ExportAnalyticsToCSV()
+        {
+            return Analytics.ExportComprehensiveCSV();
+        }
+
+        /// <summary>
+        /// Gets real-time dashboard data
+        /// </summary>
+        public DashboardData GetDashboardData()
+        {
+            return Analytics.GetDashboardData();
         }
 
         public override string ToString()
