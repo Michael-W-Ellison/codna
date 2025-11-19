@@ -1,0 +1,13 @@
+# Build output directories
+output/
+
+# Temporary build files
+*.tmp
+*.log
+
+# Package files
+*.zip
+*.tar.gz
+*.dmg
+*.exe.config
+*.pdb

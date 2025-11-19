@@ -116,10 +116,13 @@ ScaffoldingReadMe.txt
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
-[Bb]uild/
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+
+# Build scripts are tracked, but build output is not
+!build/
+build/output/
 
 # Unity Asset meta files
 *.pidb.meta
