@@ -5,6 +5,7 @@ using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
 using DigitalBiochemicalSimulator.Visualization;
+using DigitalBiochemicalSimulator.Web;
 
 namespace DigitalBiochemicalSimulator
 {
@@ -50,6 +51,7 @@ namespace DigitalBiochemicalSimulator
                             "Phase 2 Demo (Physics Simulation)",
                             "Run Full Simulation (Text Mode)",
                             "Run Full Simulation (GUI Mode)",
+                            "Run Full Simulation (Web Interface) 🌐",
                             "Exit"
                         }));
 
@@ -66,6 +68,9 @@ namespace DigitalBiochemicalSimulator
                         break;
                     case "Run Full Simulation (GUI Mode)":
                         RunFullSimulationWithGUI();
+                        break;
+                    case "Run Full Simulation (Web Interface) 🌐":
+                        RunFullSimulationWithWebInterface();
                         break;
                     case "Exit":
                         return;
@@ -431,6 +436,113 @@ namespace DigitalBiochemicalSimulator
             if (config.DamageExponent == 4.0f) return "Harsh Selection";
             if (config.VentEmissionRate == 2) return "Rapid Evolution";
             return "Custom";
+        }
+
+        /// <summary>
+        /// Runs full integrated simulation with web interface
+        /// </summary>
+        static void RunFullSimulationWithWebInterface()
+        {
+            AnsiConsole.Clear();
+            AnsiConsole.MarkupLine("[bold yellow]Full Integrated Simulation (Web Interface)[/]\n");
+
+            var config = AnsiConsole.Prompt(
+                new SelectionPrompt<SimulationConfig>()
+                    .Title("[green]Select preset configuration:[/]")
+                    .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
+                    .AddChoices(new[] {
+                        SimulationPresets.Minimal,
+                        SimulationPresets.Standard,
+                        SimulationPresets.ExpressionEvolution,
+                        SimulationPresets.HarshSelection,
+                        SimulationPresets.RapidEvolution
+                    }));
+
+            var port = AnsiConsole.Ask<int>("[cyan]Web server port:[/]", 8080);
+
+            AnsiConsole.Clear();
+            AnsiConsole.Status()
+                .Start("Initializing simulation and web server...", ctx =>
+                {
+                    ctx.Spinner(Spinner.Known.Star);
+                    ctx.Status("Starting systems...");
+                    Thread.Sleep(500);
+                });
+
+            using (var simulation = new IntegratedSimulationEngine(config))
+            using (var webServer = new SimulationWebServer(simulation, port))
+            {
+                simulation.Start();
+                webServer.Start();
+
+                AnsiConsole.Clear();
+                var panel = new Panel(
+                    new Markup($"[green]✓ Simulation running[/]\n" +
+                             $"[green]✓ Web server running on port {port}[/]\n\n" +
+                             $"[cyan]Open your browser and navigate to:[/]\n" +
+                             $"[bold white]http://localhost:{port}/[/]\n\n" +
+                             $"[yellow]Features:[/]\n" +
+                             $"  • Real-time 3D visualization with Three.js\n" +
+                             $"  • Live metrics dashboard\n" +
+                             $"  • Evolution tracker\n" +
+                             $"  • CSV/JSON data export\n" +
+                             $"  • Interactive controls\n\n" +
+                             $"[dim]Press any key to stop the simulation...[/]"))
+                {
+                    Header = new PanelHeader("[bold cyan]🌐 Web Interface Active[/]"),
+                    BorderColor = Color.Cyan,
+                    Padding = new Padding(2, 1, 2, 1)
+                };
+
+                AnsiConsole.Write(panel);
+
+                // Run simulation loop in background
+                bool running = true;
+                var simulationThread = new Thread(() =>
+                {
+                    while (running)
+                    {
+                        simulation.Update();
+                        Thread.Sleep(10);
+                    }
+                })
+                {
+                    IsBackground = true
+                };
+                simulationThread.Start();
+
+                // Wait for user to press a key
+                Console.ReadKey(true);
+                running = false;
+
+                AnsiConsole.Clear();
+                AnsiConsole.MarkupLine("[yellow]Stopping simulation and web server...[/]");
+
+                simulation.Stop();
+                webServer.Stop();
+
+                Thread.Sleep(500);
+
+                AnsiConsole.MarkupLine("[green]✓ Simulation stopped[/]");
+                AnsiConsole.MarkupLine("[green]✓ Web server stopped[/]\n");
+
+                var finalStats = simulation.GetStatistics();
+                var statsTable = new Table()
+                    .BorderColor(Color.Green)
+                    .Border(TableBorder.Rounded)
+                    .AddColumn("[bold]Metric[/]")
+                    .AddColumn("[bold]Value[/]");
+
+                statsTable.AddRow("Total Ticks", finalStats.CurrentTick.ToString());
+                statsTable.AddRow("Active Tokens", finalStats.ActiveTokenCount.ToString());
+                statsTable.AddRow("Total Generated", finalStats.TotalGenerated.ToString());
+                statsTable.AddRow("Total Chains", finalStats.TotalChains.ToString());
+                statsTable.AddRow("Stable Chains", finalStats.StableChains.ToString());
+
+                AnsiConsole.Write(new Panel(statsTable)
+                    .Header("[bold green]Final Statistics[/]")
+                    .Expand());
+            }
         }
     }
 }
