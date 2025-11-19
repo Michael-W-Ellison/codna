@@ -1,0 +1,104 @@
+Chemical Concept
+
+Orbital Overlap: Syntactic Grammar Rules
+Electronegativity: Syntactic Context & Meaning
+Energy State: Runtime Correctness & Efficiency
+Bond Type: Association Type
+ 
+
+Variables
+
+Grid Size (X x X x X): This determines the overall area available to the tokens.
+
+Number of Token Vents (1-10): Token vents introduce new tokens into the environment grid.
+
+Rate of Token Injection (1 per x ticks): This determines the speed at which token vents introduce new tokens into the environment.
+
+Ticks per Second (1-100): This determines the speed at which events occur and allows users to set the speed at a rate their computer can handle. A tick is the completion of all actions within the environment. Increasing this speed will cause the simulation speed to increase.
+
+Energy Gained (per reaction per token) (1-10): This determines how much energy is produced when tokens combine. The equation is (X + <number of tokens involved in the reaction> (-1)). Energy allows tokens to increase their height in the environment, while a lack of energy causes tokens to decrease their height at a rate of 1.
+
+Token Bond Strength: This determines the strength at which tokens are forced to combine into token chains.
+
+Covalent Bond Strength
+Ionic Bond Strength
+Van der Waals Bond Strength
+Initial Energy State (1-100): This determines the amount of energy a newly released token receives when exiting a token vent. More energy results in the tokens ascending higher in the environment before they exhaust their energy and begin to fall back towards the bottom layer.
+
+Environment Viscosity (1-10): This determines the amount of energy needed to move upward in the environment.
+
+Token Vent Distribution (Central, Distributed, Distant, Clustered, Random, Manual): This determines how token vents are distributed.
+
+Mutation Range (1-<max cell depth>): This determines the depth at which damage to tokens can occur. Tokens below this range will not receive damage.
+
+Mutation Rate (X per tick): This determines the number of times damage is attempted to be added to tokens within the mutation range.
+
+Mutation Falloff (Gradual, Abrupt): This determines if mutation rate decreases gradually as distance from the top of the environment grid increases or if it remains the same until max mutation range is reached. For example, if the environment had a cell height of 100, and a mutation range of 100, then depending on the falloff, the rate would either change or be constant. If the falloff was set to gradual, then the mutation rate would decrease as the depth increased, reaching a minimal rate at the bottom of the environment. If the falloff was set to abrupt, then the mutation rate would remain the same regardless of the depth.
+
+Cell Density (100-1000): This determines the size of the information which can exist within a single cell. Each token has a size based on its number of characters. Lower cell density will reduce the overall size that function chains can reach and decrease the number of free functions which can fill a cell.
+
+  Purpose
+
+This software design document describes the architecture and system design of the Digital Biochemical Simulator.
+
+Scope
+
+The Digital Biochemical Simulator (DBS) is intended to impose a biochemical framework to programming language tokens. The objective is to determine if novel valid code can “evolve” using naturalistic mechanisms. If achieved, this could result in completely new methods of programming and enable greater understanding of evolution and the natural world.
+
+Overview
+
+  System Overview
+
+DBS is a physics simulation which imposes biochemical rules and behavior to programming language tokens. It introduces tokens randomly into the environment using what is referred to as “token vents” (which mimic hydrothermal vents) and allows the tokens to combine based on molecular bond strength settings. There are settings which determine the amount of “energy” tokens are given, both initially and post-combination. Energy is consumed when a token increases its height within the environment. The environment simulates gravity by causing any tokens without energy to decrease their height until they reach an obstruction which prevents their downward trajectory. Tokens contain meta data which is used to determine how well they can combine with other tokens. A mutation mechanism enables to removal of meta data which simulates genetic damage. Molecular bond strength settings determine how tokens fuse together to make code. The environment is a 3-dimensional grid of cells. Each cell can hold a certain amount of “mass”. The mass of each token is determined based on the number of characters they contain. By modifying the various settings, a user can observe how lines of code form, break apart, combine, and otherwise evolve.
+
+Data is tracked via tokens, as each token becomes a data point. When tokens combine, some of their tracking information becomes combined to reduce computational overhead. Cell data holds the token information of the tokens within its area. A cell without tokens is just given a <null> value. Cells are tracked via their x, y, and z axis’. When a new simulation is created, a database is initialized which contains entries for each of the cells in the environment. Tokens are each given their own database entry, which is used to track various information. When a save event occurs, the token data is written into the cell database, recording each token’s location and data within the environment. Each tick, meta data is used to determine how the environment and the various mechanisms impact the tokens.
+
+Configuration Settings
+
+Cell: The x, y, and z location within the simulation. Responsible for storing token information during save events. Contains, Token ID, Token Energy, Token Meta Data, Linked Tokens, Mutation Zone (Yes/No).
+
+Cell Density: The amount of “mass” each cell can contain. Applies to all cells. Used to determine if tokens can enter a cell.
+
+Energy (Gained): This is the amount of energy which tokens receive when they link with another token.
+
+Energy (Initial): This is the amount of energy which tokens start with then they exit a Token Vent.
+
+Linked Tokens: The Token IDs for any other tokens which are linked to the current token. Divided into <parent> and <daughter> categories. Certain tokens can contain multiple daughter Token IDs.
+
+Mutation Falloff: A (Yes/No) value which determines if mutation rate is static or dynamic.
+
+Mutation Range: The number of cells, starting from the highest y level, that mutations can occur. Marks Cells with (Yes/No) which either enables or disables the application of mutations to tokens.
+
+Mutation Strength: The number of mutations the system attempts to apply each tick to tokens within Mutation Range.
+
+String ID: A unique value which is used to identify linked tokens as a single group. If two strings combine, the string with the smaller mass adopts the String ID of the string with the larger mass.
+
+System Info: System Date/Time.
+
+Tick (Current): Current tick.
+
+Tick (Save): Tick of the most recent save point.
+
+Token Energy: The amount of energy the token currently contains. Determines vertical movement.
+
+Token ID: A unique identifier given to each token. Enables data tracking and association.
+
+Token Injection Rate: The rate at which Token Vents produce new token.
+
+Token Meta Data: Information used to determine how successful valid token attachments are. Loss of token meta data can result in the disconnect between two tokens or a connection with a token which is not an ideal match.
+
+Token Vent: An x, y, z location on the lowest level of the environment which marks the entry point for new tokens.
+
+Viscosity: The amount of energy needed for a token to increase its vertical height.
+
+Overview of User Interface
+
+The user interface should show the 3D environmental grid. The view of the grid should be manipulatable by the user allowing for the viewing of the simulation are from a dome around and above the grid. The user should be able to zoom in and out so they can focus on specific areas within the grid.
+
+On the top of the screen there should be a bar which has a dropdown box on the lefthand side which opens the menu and its various options (New Simulation, Save, Load, Exit, etc.). The remaining space along the bar should display the current “Tick”, number of “Ticks per second”, the number of individual “Tokens”, and the number of “Token Strings”. The right side of the screen should have an information bar which shows various setting information, such as the number of cells, mutation range, mutation strength, environmental viscosity, etc.
+
+Pressing the spacebar should cause the simulation to pause. Pressing “+” should increase the tick speed per second, and pressing “-“ should decrease tick speed per second. The tokens are represented as small dots floating through the grid. Using the mouse to “select” a token should bring up its information in a window on the lower lefthand side of the screen.
+
+Scrolling text underneath the top screen bar should provide the user with updates regarding the longest function chain.
+
+There should be options for tracking various metrics: average energy availability, average token chain length, percentage of tokens with mutation damage, percentage of tokens in the mutation range, average number of tokens being added to the simulation per minute, etc.
