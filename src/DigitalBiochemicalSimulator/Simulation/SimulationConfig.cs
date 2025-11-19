@@ -86,9 +86,38 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         public bool Validate(out string? errorMessage)
         {
+            // Validate positive dimensions
             if (GridWidth <= 0 || GridHeight <= 0 || GridDepth <= 0)
             {
                 errorMessage = "Grid dimensions must be positive";
+                return false;
+            }
+
+            // Validate maximum individual dimensions
+            const int MAX_DIMENSION = 1000;
+            if (GridWidth > MAX_DIMENSION || GridHeight > MAX_DIMENSION || GridDepth > MAX_DIMENSION)
+            {
+                errorMessage = $"Grid dimensions cannot exceed {MAX_DIMENSION} (current: {GridWidth}×{GridHeight}×{GridDepth})";
+                return false;
+            }
+
+            // Validate total grid size
+            const long MAX_CELLS = 10_000_000; // 10 million cells
+            long totalCells = (long)GridWidth * GridHeight * GridDepth;
+            if (totalCells > MAX_CELLS)
+            {
+                errorMessage = $"Total grid cells ({totalCells:N0}) exceeds maximum ({MAX_CELLS:N0}). " +
+                              $"Consider using a smaller grid or implementing sparse grid optimization.";
+                return false;
+            }
+
+            // Validate estimated memory usage
+            const long MAX_MEMORY_MB = 8192; // 8 GB
+            long estimatedMemoryMB = (totalCells * 400) / (1024 * 1024); // ~400 bytes per cell
+            if (estimatedMemoryMB > MAX_MEMORY_MB)
+            {
+                errorMessage = $"Grid size would require approximately {estimatedMemoryMB:N0} MB of memory " +
+                              $"(maximum: {MAX_MEMORY_MB:N0} MB). Please reduce grid size.";
                 return false;
             }
 
@@ -119,6 +148,18 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (CriticalDamageThreshold < 0.0f || CriticalDamageThreshold > 1.0f)
             {
                 errorMessage = "Critical damage threshold must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (MaxActiveTokens < 0)
+            {
+                errorMessage = "Max active tokens cannot be negative";
+                return false;
+            }
+
+            if (TicksPerSecond <= 0)
+            {
+                errorMessage = "Ticks per second must be positive";
                 return false;
             }
 
