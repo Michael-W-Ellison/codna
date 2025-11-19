@@ -4,6 +4,7 @@ using System.Linq;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.Chemistry;
 using DigitalBiochemicalSimulator.Damage;
+using DigitalBiochemicalSimulator.Utilities;
 
 namespace DigitalBiochemicalSimulator.Simulation
 {
@@ -22,10 +23,15 @@ namespace DigitalBiochemicalSimulator.Simulation
         private readonly List<StatisticsSnapshot> _history;
         private const int MAX_HISTORY_LENGTH = 1000;
 
+        // Time-series tracker for graphs
+        private readonly TimeSeriesTracker _timeSeriesTracker;
+
         // Performance tracking
         private DateTime _lastUpdateTime;
         private long _lastTickCount;
         private double _currentTicksPerSecond;
+
+        public TimeSeriesTracker TimeSeriesTracker => _timeSeriesTracker;
 
         public SimulationStatistics(List<Token> allTokens, ChainRegistry chainRegistry, DamageSystem damageSystem)
         {
@@ -35,6 +41,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             _history = new List<StatisticsSnapshot>();
             _lastUpdateTime = DateTime.Now;
             _lastTickCount = 0;
+            _timeSeriesTracker = new TimeSeriesTracker(maxDataPoints: 10000);
         }
 
         /// <summary>
@@ -97,7 +104,52 @@ namespace DigitalBiochemicalSimulator.Simulation
                 _history.RemoveAt(0);
             }
 
+            // Record time-series data
+            RecordTimeSeriesData(snapshot);
+
             return snapshot;
+        }
+
+        /// <summary>
+        /// Records snapshot data into time-series tracker for graphing
+        /// </summary>
+        private void RecordTimeSeriesData(StatisticsSnapshot snapshot)
+        {
+            var metrics = new Dictionary<string, double>
+            {
+                // Population metrics
+                { "TotalTokens", snapshot.TotalTokens },
+                { "ActiveTokens", snapshot.ActiveTokens },
+                { "DamagedTokens", snapshot.DamagedTokens },
+                { "CriticallyDamagedTokens", snapshot.CriticallyDamagedTokens },
+                { "BondedTokens", snapshot.BondedTokens },
+
+                // Energy metrics
+                { "TotalEnergy", snapshot.TotalEnergy },
+                { "AverageEnergy", snapshot.AverageEnergy },
+                { "MinEnergy", snapshot.MinEnergy },
+                { "MaxEnergy", snapshot.MaxEnergy },
+
+                // Chain metrics
+                { "TotalChains", snapshot.TotalChains },
+                { "StableChains", snapshot.StableChains },
+                { "ValidChains", snapshot.ValidChains },
+                { "LongestChainLength", snapshot.LongestChainLength },
+                { "AverageChainLength", snapshot.AverageChainLength },
+                { "AverageChainStability", snapshot.AverageChainStability },
+                { "TotalTokensInChains", snapshot.TotalTokensInChains },
+
+                // Damage metrics
+                { "AverageDamageLevel", snapshot.AverageDamageLevel },
+
+                // Bond metrics
+                { "TotalBonds", snapshot.TotalBonds },
+
+                // Performance metrics
+                { "TicksPerSecond", snapshot.TicksPerSecond }
+            };
+
+            _timeSeriesTracker.RecordBatch(metrics, snapshot.Tick);
         }
 
         /// <summary>
