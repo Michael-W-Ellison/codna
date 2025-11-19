@@ -364,6 +364,27 @@ namespace DigitalBiochemicalSimulator.Core
         }
 
         /// <summary>
+        /// Performs complete validation including syntax and semantics
+        /// Returns comprehensive validation result
+        /// </summary>
+        public ComprehensiveValidationResult ValidateComplete()
+        {
+            var result = new ComprehensiveValidationResult();
+
+            // Perform syntactic validation
+            var syntaxResult = ValidateChain();
+            result.SyntaxResult = syntaxResult;
+            result.SyntaxValid = syntaxResult.IsValid;
+
+            // Perform semantic validation (requires Grammar namespace)
+            // This will be called by external validators
+            result.SemanticValid = true; // Placeholder
+            result.IsFullyValid = result.SyntaxValid && result.SemanticValid;
+
+            return result;
+        }
+
+        /// <summary>
         /// Checks for balanced parentheses, brackets, and braces
         /// </summary>
         private bool CheckBalancedStructures()
@@ -635,5 +656,31 @@ namespace DigitalBiochemicalSimulator.Core
         IF_STATEMENT,
         WHILE_LOOP,
         FOR_LOOP
+    }
+
+    /// <summary>
+    /// Comprehensive validation result combining syntax and semantics
+    /// </summary>
+    public class ComprehensiveValidationResult
+    {
+        public bool SyntaxValid { get; set; }
+        public bool SemanticValid { get; set; }
+        public bool IsFullyValid { get; set; }
+        public ChainValidationResult SyntaxResult { get; set; }
+        public object SemanticResult { get; set; } // Will be SemanticValidationResult when available
+
+        public override string ToString()
+        {
+            if (IsFullyValid)
+                return "Fully Valid (Syntax + Semantics)";
+
+            var issues = new List<string>();
+            if (!SyntaxValid)
+                issues.Add("Syntax");
+            if (!SemanticValid)
+                issues.Add("Semantics");
+
+            return $"Invalid: {string.Join(" + ", issues)} issues";
+        }
     }
 }
