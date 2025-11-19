@@ -60,6 +60,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// </summary>
         public bool CanAcceptToken(Token token)
         {
+            if (token == null)
+                return false;
+
             return (TotalMass + token.Mass) <= Capacity;
         }
 

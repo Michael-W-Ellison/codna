@@ -90,6 +90,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// </summary>
         public bool AddToken(Token token)
         {
+            if (token == null)
+                return false;
+
             if (!IsValidPosition(token.Position))
                 return false;
 
@@ -115,6 +118,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// </summary>
         public bool RemoveToken(Token token)
         {
+            if (token == null)
+                return false;
+
             if (!IsValidPosition(token.Position))
                 return false;
 
@@ -140,6 +146,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// </summary>
         public bool MoveToken(Token token, Vector3Int newPosition)
         {
+            if (token == null)
+                return false;
+
             if (!IsValidPosition(newPosition) || !IsValidPosition(token.Position))
                 return false;
 

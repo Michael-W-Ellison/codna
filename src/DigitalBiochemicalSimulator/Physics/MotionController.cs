@@ -28,9 +28,12 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         public void UpdateTokenMotion(List<Token> tokens)
         {
+            if (tokens == null)
+                return;
+
             foreach (var token in tokens)
             {
-                if (!token.IsActive)
+                if (token == null || !token.IsActive)
                     continue;
 
                 // Skip bonded tokens (they move with their chain head)
@@ -46,6 +49,9 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         private void UpdateSingleTokenMotion(Token token)
         {
+            if (token == null)
+                return;
+
             if (token.IsRising)
             {
                 // Rising phase: move up

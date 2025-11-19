@@ -23,9 +23,12 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         public void UpdateTokenEnergy(List<Token> tokens)
         {
+            if (tokens == null)
+                return;
+
             foreach (var token in tokens)
             {
-                if (!token.IsActive)
+                if (token == null || !token.IsActive)
                     continue;
 
                 // Rising tokens lose energy
@@ -47,7 +50,7 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         public void DistributeChainEnergy(TokenChain chain)
         {
-            if (chain.Length < 2)
+            if (chain == null || chain.Length < 2)
                 return;
 
             // Calculate bonding energy: (chain.length - 1) * energyPerBond
@@ -76,6 +79,9 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         public void TransferEnergy(Token from, Token to, int amount)
         {
+            if (from == null || to == null)
+                return;
+
             if (from.Energy < amount)
                 amount = from.Energy;
 
@@ -88,10 +94,14 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         public int GetTotalEnergy(List<Token> tokens)
         {
+            if (tokens == null)
+                return 0;
+
             int total = 0;
             foreach (var token in tokens)
             {
-                total += token.Energy;
+                if (token != null)
+                    total += token.Energy;
             }
             return total;
         }
@@ -101,7 +111,7 @@ namespace DigitalBiochemicalSimulator.Physics
         /// </summary>
         public float GetAverageEnergy(List<Token> tokens)
         {
-            if (tokens.Count == 0)
+            if (tokens == null || tokens.Count == 0)
                 return 0;
 
             return (float)GetTotalEnergy(tokens) / tokens.Count;
