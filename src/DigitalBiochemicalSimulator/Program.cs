@@ -472,14 +472,17 @@ namespace DigitalBiochemicalSimulator
                 new MultiSelectionPrompt<string>()
                     .Title("[green]Select categories to customize:[/]")
                     .NotRequired()
-                    .PageSize(10)
+                    .PageSize(15)
                     .InstructionsText("[grey](Press [blue]space[/] to toggle, [green]enter[/] to accept)[/]")
                     .AddChoices(new[] {
                         "Bond Strengths (Covalent, Ionic, Van der Waals)",
-                        "Grid Dimensions",
-                        "Energy Parameters",
-                        "Damage Parameters",
-                        "Thermal Vents",
+                        "Bonding Behavior (Radius, Minimum Strength)",
+                        "Grid Dimensions & Cell Capacity",
+                        "Energy Parameters & Metabolism",
+                        "Physics (Gravity, Viscosity, Motion)",
+                        "Damage & Mutation Parameters",
+                        "Thermal Vents & Token Distribution",
+                        "Validation & Chain Stability",
                         "Performance Limits"
                     }));
 
@@ -513,10 +516,33 @@ namespace DigitalBiochemicalSimulator
                 AnsiConsole.MarkupLine($"  Van der Waals: [yellow]{config.VanDerWaalsBondStrength:F2}x[/]");
             }
 
-            // Customize Grid Dimensions
-            if (categories.Contains("Grid Dimensions"))
+            // Customize Bonding Behavior
+            if (categories.Contains("Bonding Behavior (Radius, Minimum Strength)"))
             {
-                AnsiConsole.MarkupLine("\n[bold cyan]═══ Grid Dimensions ═══[/]\n");
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Bonding Behavior ═══[/]");
+                AnsiConsole.MarkupLine("[dim]Controls how tokens bond with each other[/]\n");
+
+                config.BondingRadius = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Bonding Radius (0=same cell only):[/]")
+                        .DefaultValue(config.BondingRadius)
+                        .ValidationErrorMessage("[red]Must be between 0 and 5[/]")
+                        .Validate(v => v >= 0 && v <= 5));
+
+                config.MinBondStrength = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Minimum Bond Strength (threshold):[/]")
+                        .DefaultValue(config.MinBondStrength)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Bonding behavior configured:");
+                AnsiConsole.MarkupLine($"  Radius: [yellow]{config.BondingRadius}[/] cells");
+                AnsiConsole.MarkupLine($"  Min Strength: [yellow]{config.MinBondStrength:F2}[/]");
+            }
+
+            // Customize Grid Dimensions & Cell Capacity
+            if (categories.Contains("Grid Dimensions & Cell Capacity"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Grid Dimensions & Cell Capacity ═══[/]\n");
 
                 config.GridWidth = AnsiConsole.Prompt(
                     new TextPrompt<int>("[cyan]Grid Width:[/]")
@@ -536,11 +562,18 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 5 and 200[/]")
                         .Validate(v => v >= 5 && v <= 200));
 
+                config.CellCapacity = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Cell Capacity (max tokens per cell):[/]")
+                        .DefaultValue(config.CellCapacity)
+                        .ValidationErrorMessage("[red]Must be between 10 and 10000[/]")
+                        .Validate(v => v >= 10 && v <= 10000));
+
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Grid: [yellow]{config.GridWidth}×{config.GridHeight}×{config.GridDepth}[/]");
+                AnsiConsole.MarkupLine($"  Cell Capacity: [yellow]{config.CellCapacity}[/] tokens");
             }
 
-            // Customize Energy Parameters
-            if (categories.Contains("Energy Parameters"))
+            // Customize Energy Parameters & Metabolism
+            if (categories.Contains("Energy Parameters & Metabolism"))
             {
                 AnsiConsole.MarkupLine("\n[bold cyan]═══ Energy Parameters ═══[/]\n");
 
@@ -562,11 +595,45 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 0 and 20[/]")
                         .Validate(v => v >= 0 && v <= 20));
 
-                AnsiConsole.MarkupLine($"\n[green]✓[/] Energy parameters configured");
+                config.EnvironmentViscosity = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Environment Viscosity (energy cost to rise):[/]")
+                        .DefaultValue(config.EnvironmentViscosity)
+                        .ValidationErrorMessage("[red]Must be between 0 and 10[/]")
+                        .Validate(v => v >= 0 && v <= 10));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Energy & metabolism configured");
             }
 
-            // Customize Damage Parameters
-            if (categories.Contains("Damage Parameters"))
+            // Customize Physics
+            if (categories.Contains("Physics (Gravity, Viscosity, Motion)"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Physics Parameters ═══[/]");
+                AnsiConsole.MarkupLine("[dim]Controls movement and gravity in the simulation[/]\n");
+
+                config.GravityEnabled = AnsiConsole.Confirm(
+                    "[cyan]Enable Gravity?[/]",
+                    config.GravityEnabled);
+
+                config.RiseRate = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Rise Rate (cells per tick):[/]")
+                        .DefaultValue(config.RiseRate)
+                        .ValidationErrorMessage("[red]Must be between 1 and 10[/]")
+                        .Validate(v => v >= 1 && v <= 10));
+
+                config.FallRate = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Fall Rate (cells per tick):[/]")
+                        .DefaultValue(config.FallRate)
+                        .ValidationErrorMessage("[red]Must be between 1 and 10[/]")
+                        .Validate(v => v >= 1 && v <= 10));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Physics configured:");
+                AnsiConsole.MarkupLine($"  Gravity: [yellow]{(config.GravityEnabled ? "Enabled" : "Disabled")}[/]");
+                AnsiConsole.MarkupLine($"  Rise Rate: [yellow]{config.RiseRate}[/] cells/tick");
+                AnsiConsole.MarkupLine($"  Fall Rate: [yellow]{config.FallRate}[/] cells/tick");
+            }
+
+            // Customize Damage & Mutation Parameters
+            if (categories.Contains("Damage & Mutation Parameters"))
             {
                 AnsiConsole.MarkupLine("\n[bold cyan]═══ Damage Parameters ═══[/]\n");
 
@@ -588,11 +655,42 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 0.5 and 1.0[/]")
                         .Validate(v => v >= 0.5f && v <= 1.0f));
 
-                AnsiConsole.MarkupLine($"\n[green]✓[/] Damage parameters configured");
+                config.DamageIncrement = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Damage Increment (per collision):[/]")
+                        .DefaultValue(config.DamageIncrement)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.MutationRange = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Mutation Range (cells from top):[/]")
+                        .DefaultValue(config.MutationRange)
+                        .ValidationErrorMessage("[red]Must be between 0 and 50[/]")
+                        .Validate(v => v >= 0 && v <= 50));
+
+                config.MutationRate = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Mutation Rate (attempts per tick):[/]")
+                        .DefaultValue(config.MutationRate)
+                        .ValidationErrorMessage("[red]Must be between 0 and 100[/]")
+                        .Validate(v => v >= 0 && v <= 100));
+
+                var mutationFalloffChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("[cyan]Mutation Falloff Pattern:[/]")
+                        .AddChoices(new[] { "Gradual", "Sharp", "None" }));
+
+                config.MutationFalloff = mutationFalloffChoice switch
+                {
+                    "Gradual" => MutationFalloff.Gradual,
+                    "Sharp" => MutationFalloff.Sharp,
+                    "None" => MutationFalloff.None,
+                    _ => MutationFalloff.Gradual
+                };
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Damage & mutation configured");
             }
 
-            // Customize Thermal Vents
-            if (categories.Contains("Thermal Vents"))
+            // Customize Thermal Vents & Token Distribution
+            if (categories.Contains("Thermal Vents & Token Distribution"))
             {
                 AnsiConsole.MarkupLine("\n[bold cyan]═══ Thermal Vents ═══[/]\n");
 
@@ -608,7 +706,62 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 1 and 100[/]")
                         .Validate(v => v >= 1 && v <= 100));
 
-                AnsiConsole.MarkupLine($"\n[green]✓[/] Thermal vents configured");
+                var ventDistChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("[cyan]Vent Distribution Pattern:[/]")
+                        .AddChoices(new[] { "Central", "Distributed", "Random" }));
+
+                config.VentDistribution = ventDistChoice switch
+                {
+                    "Central" => VentDistribution.Central,
+                    "Distributed" => VentDistribution.Distributed,
+                    "Random" => VentDistribution.Random,
+                    _ => VentDistribution.Central
+                };
+
+                var tokenDistChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("[cyan]Token Distribution Profile:[/]")
+                        .AddChoices(new[] { "Balanced", "Expression Heavy", "Control Heavy" }));
+
+                config.TokenDistribution = tokenDistChoice switch
+                {
+                    "Balanced" => TokenDistributionProfile.Balanced,
+                    "Expression Heavy" => TokenDistributionProfile.ExpressionHeavy,
+                    "Control Heavy" => TokenDistributionProfile.ControlHeavy,
+                    _ => TokenDistributionProfile.Balanced
+                };
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Thermal vents & token distribution configured:");
+                AnsiConsole.MarkupLine($"  Vents: [yellow]{config.NumberOfVents}[/] ({ventDistChoice})");
+                AnsiConsole.MarkupLine($"  Distribution: [yellow]{tokenDistChoice}[/]");
+            }
+
+            // Customize Validation & Chain Stability
+            if (categories.Contains("Validation & Chain Stability"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Validation & Chain Stability ═══[/]");
+                AnsiConsole.MarkupLine("[dim]Controls how chains are validated and stabilized[/]\n");
+
+                config.MinValidationLength = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Min Validation Length (tokens):[/]")
+                        .DefaultValue(config.MinValidationLength)
+                        .ValidationErrorMessage("[red]Must be between 2 and 20[/]")
+                        .Validate(v => v >= 2 && v <= 20));
+
+                config.StabilityThreshold = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Stability Threshold (ticks without bonding):[/]")
+                        .DefaultValue(config.StabilityThreshold)
+                        .ValidationErrorMessage("[red]Must be between 1 and 100[/]")
+                        .Validate(v => v >= 1 && v <= 100));
+
+                config.ValidationFrequency = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Validation Frequency (check every N ticks):[/]")
+                        .DefaultValue(config.ValidationFrequency)
+                        .ValidationErrorMessage("[red]Must be between 1 and 50[/]")
+                        .Validate(v => v >= 1 && v <= 50));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Validation & stability configured");
             }
 
             // Customize Performance Limits
