@@ -1,8 +1,10 @@
 using System;
 using System.Threading;
+using Spectre.Console;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
+using DigitalBiochemicalSimulator.Visualization;
 
 namespace DigitalBiochemicalSimulator
 {
@@ -33,35 +35,48 @@ namespace DigitalBiochemicalSimulator
         {
             while (true)
             {
-                Console.WriteLine("--- Main Menu ---");
-                Console.WriteLine("1. Phase 1 Demo (Core Data Structures)");
-                Console.WriteLine("2. Phase 2 Demo (Physics Simulation)");
-                Console.WriteLine("3. Run Full Simulation");
-                Console.WriteLine("4. Exit");
-                Console.WriteLine();
-                Console.Write("Select option: ");
+                AnsiConsole.Clear();
+                AnsiConsole.Write(
+                    new FigletText("Digital Biochemical Simulator")
+                        .Centered()
+                        .Color(Color.Cyan));
 
-                var input = Console.ReadLine();
+                var choice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("[green]Select simulation mode:[/]")
+                        .PageSize(10)
+                        .AddChoices(new[] {
+                            "Phase 1 Demo (Core Data Structures)",
+                            "Phase 2 Demo (Physics Simulation)",
+                            "Run Full Simulation (Text Mode)",
+                            "Run Full Simulation (GUI Mode)",
+                            "Exit"
+                        }));
 
-                switch (input)
+                switch (choice)
                 {
-                    case "1":
+                    case "Phase 1 Demo (Core Data Structures)":
                         DemoPhase1();
                         break;
-                    case "2":
+                    case "Phase 2 Demo (Physics Simulation)":
                         DemoPhase2();
                         break;
-                    case "3":
+                    case "Run Full Simulation (Text Mode)":
                         RunFullSimulation();
                         break;
-                    case "4":
-                        return;
-                    default:
-                        Console.WriteLine("Invalid option. Try again.");
+                    case "Run Full Simulation (GUI Mode)":
+                        RunFullSimulationWithGUI();
                         break;
+                    case "Exit":
+                        return;
                 }
 
-                Console.WriteLine();
+                if (choice != "Exit")
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLine("[dim]Press any key to continue...[/]");
+                    Console.ReadKey();
+                }
             }
         }
 
@@ -284,6 +299,138 @@ namespace DigitalBiochemicalSimulator
             var finalStats = simulation.GetStatistics();
             Console.WriteLine("\nFinal Statistics:");
             Console.WriteLine(finalStats.ToString());
+        }
+
+        /// <summary>
+        /// Runs full integrated simulation with GUI visualization
+        /// </summary>
+        static void RunFullSimulationWithGUI()
+        {
+            AnsiConsole.Clear();
+            AnsiConsole.MarkupLine("[bold yellow]Full Integrated Simulation (GUI Mode)[/]\n");
+
+            var config = AnsiConsole.Prompt(
+                new SelectionPrompt<SimulationConfig>()
+                    .Title("[green]Select preset configuration:[/]")
+                    .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
+                    .AddChoices(new[] {
+                        SimulationPresets.Minimal,
+                        SimulationPresets.Standard,
+                        SimulationPresets.ExpressionEvolution,
+                        SimulationPresets.HarshSelection,
+                        SimulationPresets.RapidEvolution
+                    }));
+
+            AnsiConsole.Clear();
+            AnsiConsole.Status()
+                .Start("Initializing simulation...", ctx =>
+                {
+                    ctx.Spinner(Spinner.Known.Star);
+                    ctx.Status("Loading systems...");
+                    Thread.Sleep(500);
+                });
+
+            using (var simulation = new IntegratedSimulationEngine(config))
+            {
+                var visualizer = new VisualizationEngine(simulation.Grid);
+
+                simulation.Start();
+
+                AnsiConsole.MarkupLine("[green]Simulation started![/]");
+                AnsiConsole.MarkupLine("[dim]Use keyboard controls to interact with the visualization[/]");
+                Thread.Sleep(1000);
+
+                bool running = true;
+                int frameCount = 0;
+
+                while (running)
+                {
+                    // Update simulation
+                    simulation.Update();
+
+                    // Render GUI every few frames to reduce overhead
+                    if (frameCount % 3 == 0)
+                    {
+                        try
+                        {
+                            visualizer.Render(simulation);
+                        }
+                        catch
+                        {
+                            // Fallback to simple rendering if layout fails
+                            visualizer.RenderSimple(simulation);
+                        }
+                    }
+
+                    frameCount++;
+
+                    // Check for user input (non-blocking)
+                    if (Console.KeyAvailable)
+                    {
+                        var key = Console.ReadKey(true).Key;
+                        switch (key)
+                        {
+                            case ConsoleKey.UpArrow:
+                                visualizer.IncrementLayer();
+                                break;
+                            case ConsoleKey.DownArrow:
+                                visualizer.DecrementLayer();
+                                break;
+                            case ConsoleKey.M:
+                                visualizer.ToggleMetrics();
+                                break;
+                            case ConsoleKey.L:
+                                visualizer.ToggleLegend();
+                                break;
+                            case ConsoleKey.P:
+                                simulation.SetPaused(!simulation.TickManager.IsPaused);
+                                break;
+                            case ConsoleKey.Q:
+                                running = false;
+                                break;
+                        }
+                    }
+
+                    Thread.Sleep(16); // ~60 FPS target
+                }
+
+                simulation.Stop();
+
+                AnsiConsole.Clear();
+                AnsiConsole.MarkupLine("[yellow]Simulation stopped.[/]\n");
+
+                var finalStats = simulation.GetStatistics();
+                var statsTable = new Table()
+                    .BorderColor(Color.Green)
+                    .Border(TableBorder.Rounded)
+                    .AddColumn("[bold]Metric[/]")
+                    .AddColumn("[bold]Value[/]");
+
+                statsTable.AddRow("Total Ticks", finalStats.CurrentTick.ToString());
+                statsTable.AddRow("Active Tokens", finalStats.ActiveTokenCount.ToString());
+                statsTable.AddRow("Total Generated", finalStats.TotalGenerated.ToString());
+                statsTable.AddRow("Total Destroyed", finalStats.TotalDestroyed.ToString());
+                statsTable.AddRow("Total Chains", finalStats.TotalChains.ToString());
+                statsTable.AddRow("Stable Chains", finalStats.StableChains.ToString());
+                statsTable.AddRow("Longest Chain", finalStats.LongestChainLength.ToString());
+
+                AnsiConsole.Write(new Panel(statsTable)
+                    .Header("[bold green]Final Statistics[/]")
+                    .Expand());
+            }
+        }
+
+        /// <summary>
+        /// Gets a friendly name for a preset configuration
+        /// </summary>
+        static string GetPresetName(SimulationConfig config)
+        {
+            if (config.GridWidth == 10) return "Minimal";
+            if (config.GridWidth == 50) return "Standard";
+            if (config.DamageExponent == 2.5f) return "Expression Evolution";
+            if (config.DamageExponent == 4.0f) return "Harsh Selection";
+            if (config.VentEmissionRate == 2) return "Rapid Evolution";
+            return "Custom";
         }
     }
 }
