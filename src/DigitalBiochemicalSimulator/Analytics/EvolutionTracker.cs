@@ -118,6 +118,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         /// <summary>
         /// Calculates fitness score for a chain
         /// Higher score = more "successful" evolution
+        /// Thread-safe implementation
         /// </summary>
         public double CalculateFitness(TokenChain chain, long currentTick)
         {
@@ -133,10 +134,13 @@ namespace DigitalBiochemicalSimulator.Analytics
             fitness += chain.StabilityScore * 100;
 
             // Factor 3: Age (older chains that survive are fitter)
-            if (_lineages.TryGetValue(chain.Id, out var lineage))
+            lock (_trackerLock)
             {
-                long age = currentTick - lineage.BirthTick;
-                fitness += Math.Log(age + 1) * 20;
+                if (_lineages.TryGetValue(chain.Id, out var lineage))
+                {
+                    long age = currentTick - lineage.BirthTick;
+                    fitness += Math.Log(age + 1) * 20;
+                }
             }
 
             // Factor 4: Pattern complexity (more diverse tokens = higher fitness)
