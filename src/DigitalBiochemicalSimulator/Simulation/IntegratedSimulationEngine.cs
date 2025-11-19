@@ -14,9 +14,11 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// <summary>
     /// Fully integrated simulation engine with all systems.
     /// Orchestrates physics, chemistry, grammar, bonding, damage, and chains.
+    /// Implements IDisposable for proper resource cleanup.
     /// </summary>
-    public class IntegratedSimulationEngine
+    public class IntegratedSimulationEngine : IDisposable
     {
+        private bool _disposed = false;
         // Configuration
         public SimulationConfig Config { get; private set; }
 
@@ -498,6 +500,65 @@ namespace DigitalBiochemicalSimulator.Simulation
                    $"Tokens:{ActiveTokens.Count}, " +
                    $"Chains:{ChainRegistry.Count}, " +
                    $"Longest:{ChainRegistry.GetLongestChain()?.Length ?? 0})";
+        }
+
+        /// <summary>
+        /// Disposes of all resources used by the simulation engine
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected dispose method
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Stop simulation
+                if (IsRunning)
+                {
+                    Stop();
+                }
+
+                // Clear and release all tokens
+                if (ActiveTokens != null)
+                {
+                    foreach (var token in ActiveTokens.ToList())
+                    {
+                        Grid?.RemoveToken(token);
+                        TokenPool?.ReleaseToken(token);
+                    }
+                    ActiveTokens.Clear();
+                }
+
+                // Clear all systems
+                TokenPool?.Clear();
+                ChainRegistry?.Clear();
+                Grid?.Clear();
+
+                // Clear statistics
+                Statistics?.ClearHistory();
+
+                // Clear thermal vents
+                ThermalVents?.Clear();
+            }
+
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Finalizer
+        /// </summary>
+        ~IntegratedSimulationEngine()
+        {
+            Dispose(false);
         }
     }
 

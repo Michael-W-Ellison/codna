@@ -8,6 +8,7 @@ namespace DigitalBiochemicalSimulator.Utilities
     /// <summary>
     /// Object pool for token reuse and performance optimization.
     /// Based on section 8.1 of the design specification.
+    /// Thread-safe for concurrent access.
     /// </summary>
     public class TokenPool
     {
@@ -15,10 +16,40 @@ namespace DigitalBiochemicalSimulator.Utilities
         private HashSet<Token> _activeTokens;
         private int _maxPoolSize;
         private int _totalCreated;
+        private readonly object _poolLock = new object();
 
-        public int AvailableCount => _availableTokens.Count;
-        public int ActiveCount => _activeTokens.Count;
-        public int TotalCreated => _totalCreated;
+        public int AvailableCount
+        {
+            get
+            {
+                lock (_poolLock)
+                {
+                    return _availableTokens.Count;
+                }
+            }
+        }
+
+        public int ActiveCount
+        {
+            get
+            {
+                lock (_poolLock)
+                {
+                    return _activeTokens.Count;
+                }
+            }
+        }
+
+        public int TotalCreated
+        {
+            get
+            {
+                lock (_poolLock)
+                {
+                    return _totalCreated;
+                }
+            }
+        }
 
         public TokenPool(int initialSize = 100, int maxPoolSize = 1000)
         {
@@ -36,53 +67,78 @@ namespace DigitalBiochemicalSimulator.Utilities
         }
 
         /// <summary>
-        /// Gets a token from the pool or creates a new one
+        /// Gets a token from the pool or creates a new one (thread-safe)
         /// </summary>
         public Token GetToken(TokenType type, string value, Vector3Int position)
         {
-            Token token;
-
-            if (_availableTokens.Count > 0)
+            lock (_poolLock)
             {
-                token = _availableTokens.Dequeue();
-                ResetToken(token, type, value, position);
-            }
-            else
-            {
-                token = CreateNewToken();
-                InitializeToken(token, type, value, position);
-            }
+                Token token;
 
-            _activeTokens.Add(token);
-            return token;
+                if (_availableTokens.Count > 0)
+                {
+                    token = _availableTokens.Dequeue();
+                    ResetToken(token, type, value, position);
+                }
+                else
+                {
+                    token = CreateNewToken();
+                    InitializeToken(token, type, value, position);
+                }
+
+                _activeTokens.Add(token);
+                return token;
+            }
         }
 
         /// <summary>
-        /// Returns a token to the pool for reuse
+        /// Returns a token to the pool for reuse (thread-safe)
         /// </summary>
         public void ReleaseToken(Token token)
         {
-            if (token == null || !_activeTokens.Contains(token))
+            if (token == null)
                 return;
 
-            _activeTokens.Remove(token);
-
-            // Only pool if we haven't exceeded max size
-            if (_availableTokens.Count < _maxPoolSize)
+            lock (_poolLock)
             {
-                CleanToken(token);
-                _availableTokens.Enqueue(token);
+                if (!_activeTokens.Contains(token))
+                    return;
+
+                _activeTokens.Remove(token);
+
+                // Only pool if we haven't exceeded max size
+                if (_availableTokens.Count < _maxPoolSize)
+                {
+                    CleanToken(token);
+                    _availableTokens.Enqueue(token);
+                }
             }
         }
 
         /// <summary>
-        /// Returns multiple tokens to the pool
+        /// Returns multiple tokens to the pool (thread-safe)
         /// </summary>
         public void ReleaseTokens(IEnumerable<Token> tokens)
         {
-            foreach (var token in tokens)
+            if (tokens == null)
+                return;
+
+            lock (_poolLock)
             {
-                ReleaseToken(token);
+                foreach (var token in tokens)
+                {
+                    if (token == null || !_activeTokens.Contains(token))
+                        continue;
+
+                    _activeTokens.Remove(token);
+
+                    // Only pool if we haven't exceeded max size
+                    if (_availableTokens.Count < _maxPoolSize)
+                    {
+                        CleanToken(token);
+                        _availableTokens.Enqueue(token);
+                    }
+                }
             }
         }
 
@@ -157,17 +213,23 @@ namespace DigitalBiochemicalSimulator.Utilities
         }
 
         /// <summary>
-        /// Clears the entire pool
+        /// Clears the entire pool (thread-safe)
         /// </summary>
         public void Clear()
         {
-            _availableTokens.Clear();
-            _activeTokens.Clear();
+            lock (_poolLock)
+            {
+                _availableTokens.Clear();
+                _activeTokens.Clear();
+            }
         }
 
         public override string ToString()
         {
-            return $"TokenPool(Active:{ActiveCount}, Available:{AvailableCount}, Total Created:{TotalCreated})";
+            lock (_poolLock)
+            {
+                return $"TokenPool(Active:{_activeTokens.Count}, Available:{_availableTokens.Count}, Total Created:{_totalCreated})";
+            }
         }
     }
 }

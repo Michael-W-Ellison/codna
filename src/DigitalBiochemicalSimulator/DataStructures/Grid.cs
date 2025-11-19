@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using DigitalBiochemicalSimulator.Core;
 
 namespace DigitalBiochemicalSimulator.DataStructures
@@ -8,6 +10,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
     /// <summary>
     /// 3D grid system for spatial partitioning and token management.
     /// Based on section 3.2 of the design specification.
+    /// Thread-safe for concurrent access.
     /// </summary>
     public class Grid
     {
@@ -17,13 +20,15 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public int Depth => Dimensions.Z;
 
         private Cell[,,] _cells;
-        public HashSet<Vector3Int> ActiveCells { get; private set; }
+        private readonly ConcurrentDictionary<Vector3Int, byte> _activeCells;
+        private readonly ReaderWriterLockSlim _cellLock;
 
         public Grid(int width, int height, int depth, int cellCapacity = 1000)
         {
             Dimensions = new Vector3Int(width, height, depth);
             _cells = new Cell[width, height, depth];
-            ActiveCells = new HashSet<Vector3Int>();
+            _activeCells = new ConcurrentDictionary<Vector3Int, byte>();
+            _cellLock = new ReaderWriterLockSlim();
 
             InitializeCells(cellCapacity);
         }
@@ -44,18 +49,26 @@ namespace DigitalBiochemicalSimulator.DataStructures
         }
 
         /// <summary>
-        /// Gets a cell at the specified position
+        /// Gets a cell at the specified position (thread-safe for reads)
         /// </summary>
         public Cell? GetCell(Vector3Int position)
         {
             if (!IsValidPosition(position))
                 return null;
 
-            return _cells[position.X, position.Y, position.Z];
+            _cellLock.EnterReadLock();
+            try
+            {
+                return _cells[position.X, position.Y, position.Z];
+            }
+            finally
+            {
+                _cellLock.ExitReadLock();
+            }
         }
 
         /// <summary>
-        /// Gets a cell at the specified coordinates
+        /// Gets a cell at the specified coordinates (thread-safe for reads)
         /// </summary>
         public Cell? GetCell(int x, int y, int z)
         {
@@ -73,70 +86,88 @@ namespace DigitalBiochemicalSimulator.DataStructures
         }
 
         /// <summary>
-        /// Adds a token to the grid at its current position
+        /// Adds a token to the grid at its current position (thread-safe)
         /// </summary>
         public bool AddToken(Token token)
         {
-            var cell = GetCell(token.Position);
-            if (cell == null)
+            if (!IsValidPosition(token.Position))
                 return false;
 
-            bool success = cell.AddToken(token);
-            if (success && !ActiveCells.Contains(cell.Position))
+            _cellLock.EnterWriteLock();
+            try
             {
-                ActiveCells.Add(cell.Position);
+                var cell = _cells[token.Position.X, token.Position.Y, token.Position.Z];
+                bool success = cell.AddToken(token);
+                if (success)
+                {
+                    _activeCells.TryAdd(cell.Position, 0);
+                }
+                return success;
             }
-
-            return success;
+            finally
+            {
+                _cellLock.ExitWriteLock();
+            }
         }
 
         /// <summary>
-        /// Removes a token from the grid
+        /// Removes a token from the grid (thread-safe)
         /// </summary>
         public bool RemoveToken(Token token)
         {
-            var cell = GetCell(token.Position);
-            if (cell == null)
+            if (!IsValidPosition(token.Position))
                 return false;
 
-            bool success = cell.RemoveToken(token);
-            if (success && cell.IsEmpty)
+            _cellLock.EnterWriteLock();
+            try
             {
-                ActiveCells.Remove(cell.Position);
+                var cell = _cells[token.Position.X, token.Position.Y, token.Position.Z];
+                bool success = cell.RemoveToken(token);
+                if (success && cell.IsEmpty)
+                {
+                    _activeCells.TryRemove(cell.Position, out _);
+                }
+                return success;
             }
-
-            return success;
+            finally
+            {
+                _cellLock.ExitWriteLock();
+            }
         }
 
         /// <summary>
-        /// Moves a token from one position to another
+        /// Moves a token from one position to another (thread-safe)
         /// </summary>
         public bool MoveToken(Token token, Vector3Int newPosition)
         {
-            if (!IsValidPosition(newPosition))
+            if (!IsValidPosition(newPosition) || !IsValidPosition(token.Position))
                 return false;
 
-            var oldCell = GetCell(token.Position);
-            var newCell = GetCell(newPosition);
+            _cellLock.EnterWriteLock();
+            try
+            {
+                var oldCell = _cells[token.Position.X, token.Position.Y, token.Position.Z];
+                var newCell = _cells[newPosition.X, newPosition.Y, newPosition.Z];
 
-            if (oldCell == null || newCell == null)
-                return false;
+                // Check if new cell can accept the token
+                if (!newCell.CanAcceptToken(token))
+                    return false;
 
-            // Check if new cell can accept the token
-            if (!newCell.CanAcceptToken(token))
-                return false;
+                // Move the token
+                oldCell.RemoveToken(token);
+                newCell.AddToken(token);
 
-            // Move the token
-            oldCell.RemoveToken(token);
-            newCell.AddToken(token);
+                // Update active cells
+                if (oldCell.IsEmpty)
+                    _activeCells.TryRemove(oldCell.Position, out _);
+                _activeCells.TryAdd(newCell.Position, 0);
 
-            // Update active cells
-            if (oldCell.IsEmpty)
-                ActiveCells.Remove(oldCell.Position);
-            if (!ActiveCells.Contains(newCell.Position))
-                ActiveCells.Add(newCell.Position);
-
-            return true;
+                return true;
+            }
+            finally
+            {
+                _cellLock.ExitWriteLock();
+            }
         }
 
         /// <summary>
@@ -189,70 +220,141 @@ namespace DigitalBiochemicalSimulator.DataStructures
         }
 
         /// <summary>
-        /// Gets all tokens in the grid
+        /// Gets all tokens in the grid (thread-safe)
         /// </summary>
         public List<Token> GetAllTokens()
         {
             var allTokens = new List<Token>();
-            foreach (var cellPos in ActiveCells)
+
+            _cellLock.EnterReadLock();
+            try
             {
-                var cell = GetCell(cellPos);
-                if (cell != null)
-                    allTokens.AddRange(cell.Tokens);
+                foreach (var cellPos in _activeCells.Keys)
+                {
+                    var cell = _cells[cellPos.X, cellPos.Y, cellPos.Z];
+                    if (cell != null)
+                        allTokens.AddRange(cell.Tokens);
+                }
             }
+            finally
+            {
+                _cellLock.ExitReadLock();
+            }
+
             return allTokens;
         }
 
         /// <summary>
-        /// Gets tokens within a radius of a position
+        /// Gets tokens within a radius of a position (thread-safe)
         /// </summary>
         public List<Token> GetTokensInRadius(Vector3Int center, int radius)
         {
             var tokens = new List<Token>();
 
-            for (int x = Math.Max(0, center.X - radius); x <= Math.Min(Width - 1, center.X + radius); x++)
+            _cellLock.EnterReadLock();
+            try
             {
-                for (int y = Math.Max(0, center.Y - radius); y <= Math.Min(Height - 1, center.Y + radius); y++)
+                for (int x = Math.Max(0, center.X - radius); x <= Math.Min(Width - 1, center.X + radius); x++)
                 {
-                    for (int z = Math.Max(0, center.Z - radius); z <= Math.Min(Depth - 1, center.Z + radius); z++)
+                    for (int y = Math.Max(0, center.Y - radius); y <= Math.Min(Height - 1, center.Y + radius); y++)
                     {
-                        var pos = new Vector3Int(x, y, z);
-                        if (center.ManhattanDistance(pos) <= radius)
+                        for (int z = Math.Max(0, center.Z - radius); z <= Math.Min(Depth - 1, center.Z + radius); z++)
                         {
-                            var cell = GetCell(pos);
-                            if (cell != null)
-                                tokens.AddRange(cell.Tokens);
+                            var pos = new Vector3Int(x, y, z);
+                            if (center.ManhattanDistance(pos) <= radius)
+                            {
+                                var cell = _cells[x, y, z];
+                                if (cell != null)
+                                    tokens.AddRange(cell.Tokens);
+                            }
                         }
                     }
                 }
+            }
+            finally
+            {
+                _cellLock.ExitReadLock();
             }
 
             return tokens;
         }
 
         /// <summary>
-        /// Marks cells in mutation zone based on altitude
+        /// Marks cells in mutation zone based on altitude (thread-safe)
         /// </summary>
         public void UpdateMutationZone(int mutationRange)
         {
             int mutationThreshold = Depth - mutationRange;
 
-            for (int x = 0; x < Width; x++)
+            _cellLock.EnterWriteLock();
+            try
             {
-                for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
                 {
-                    for (int z = 0; z < Depth; z++)
+                    for (int y = 0; y < Height; y++)
                     {
-                        _cells[x, y, z].IsInMutationZone = z >= mutationThreshold;
+                        for (int z = 0; z < Depth; z++)
+                        {
+                            _cells[x, y, z].IsInMutationZone = z >= mutationThreshold;
+                        }
                     }
                 }
+            }
+            finally
+            {
+                _cellLock.ExitWriteLock();
+            }
+        }
+
+        /// <summary>
+        /// Gets active cells (thread-safe snapshot)
+        /// </summary>
+        public HashSet<Vector3Int> ActiveCells
+        {
+            get
+            {
+                return new HashSet<Vector3Int>(_activeCells.Keys);
+            }
+        }
+
+        /// <summary>
+        /// Clears all tokens from the grid (thread-safe)
+        /// </summary>
+        public void Clear()
+        {
+            _cellLock.EnterWriteLock();
+            try
+            {
+                foreach (var cellPos in _activeCells.Keys)
+                {
+                    var cell = _cells[cellPos.X, cellPos.Y, cellPos.Z];
+                    cell?.Clear();
+                }
+                _activeCells.Clear();
+            }
+            finally
+            {
+                _cellLock.ExitWriteLock();
             }
         }
 
         public override string ToString()
         {
-            int totalTokens = ActiveCells.Sum(pos => GetCell(pos)?.Tokens.Count ?? 0);
-            return $"Grid({Width}x{Height}x{Depth}, ActiveCells:{ActiveCells.Count}, TotalTokens:{totalTokens})";
+            int totalTokens = 0;
+            int activeCellCount = 0;
+
+            _cellLock.EnterReadLock();
+            try
+            {
+                activeCellCount = _activeCells.Count;
+                totalTokens = _activeCells.Keys.Sum(pos => _cells[pos.X, pos.Y, pos.Z]?.Tokens.Count ?? 0);
+            }
+            finally
+            {
+                _cellLock.ExitReadLock();
+            }
+
+            return $"Grid({Width}x{Height}x{Depth}, ActiveCells:{activeCellCount}, TotalTokens:{totalTokens})";
         }
     }
 }

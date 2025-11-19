@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
@@ -8,13 +9,15 @@ namespace DigitalBiochemicalSimulator.Chemistry
     /// <summary>
     /// Registry for tracking all active and stable token chains.
     /// Based on section 4.3 of the design specification.
+    /// Thread-safe for concurrent access.
     /// </summary>
     public class ChainRegistry
     {
-        private readonly Dictionary<long, TokenChain> _chains;
+        private readonly ConcurrentDictionary<long, TokenChain> _chains;
         private readonly List<TokenChain> _stableChains;
         private readonly ChainStabilityCalculator _stabilityCalculator;
         private long _nextChainId;
+        private readonly object _registryLock = new object();
 
         // Stability thresholds
         private const float STABILITY_THRESHOLD = 0.5f;      // Minimum to be considered "stable"
@@ -23,21 +26,21 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
         public ChainRegistry(ChainStabilityCalculator stabilityCalculator)
         {
-            _chains = new Dictionary<long, TokenChain>();
+            _chains = new ConcurrentDictionary<long, TokenChain>();
             _stableChains = new List<TokenChain>();
             _stabilityCalculator = stabilityCalculator;
             _nextChainId = 1;
         }
 
         /// <summary>
-        /// Registers a new chain
+        /// Registers a new chain (thread-safe)
         /// </summary>
         public long RegisterChain(TokenChain chain)
         {
             if (chain == null)
                 return -1;
 
-            long id = _nextChainId++;
+            long id = System.Threading.Interlocked.Increment(ref _nextChainId);
             chain.Id = id;
             _chains[id] = chain;
 
@@ -45,7 +48,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Gets a chain by ID
+        /// Gets a chain by ID (thread-safe)
         /// </summary>
         public TokenChain GetChain(long id)
         {
@@ -53,21 +56,23 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Removes a chain from the registry
+        /// Removes a chain from the registry (thread-safe)
         /// </summary>
         public bool RemoveChain(long id)
         {
-            if (_chains.TryGetValue(id, out var chain))
+            if (_chains.TryRemove(id, out var chain))
             {
-                _chains.Remove(id);
-                _stableChains.Remove(chain);
+                lock (_registryLock)
+                {
+                    _stableChains.Remove(chain);
+                }
                 return true;
             }
             return false;
         }
 
         /// <summary>
-        /// Updates stability scores for all chains
+        /// Updates stability scores for all chains (thread-safe)
         /// </summary>
         public void UpdateAllStabilities(long currentTick)
         {
@@ -99,7 +104,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Updates whether a chain is considered "stable"
+        /// Updates whether a chain is considered "stable" (thread-safe)
         /// </summary>
         private void UpdateStableStatus(TokenChain chain, long currentTick)
         {
@@ -109,13 +114,16 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
             bool isStable = meetsAgeRequirement && meetsStabilityRequirement;
 
-            if (isStable && !_stableChains.Contains(chain))
+            lock (_registryLock)
             {
-                _stableChains.Add(chain);
-            }
-            else if (!isStable && _stableChains.Contains(chain))
-            {
-                _stableChains.Remove(chain);
+                if (isStable && !_stableChains.Contains(chain))
+                {
+                    _stableChains.Add(chain);
+                }
+                else if (!isStable && _stableChains.Contains(chain))
+                {
+                    _stableChains.Remove(chain);
+                }
             }
         }
 
@@ -128,11 +136,14 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Gets only stable chains
+        /// Gets only stable chains (thread-safe)
         /// </summary>
         public List<TokenChain> GetStableChains()
         {
-            return new List<TokenChain>(_stableChains);
+            lock (_registryLock)
+            {
+                return new List<TokenChain>(_stableChains);
+            }
         }
 
         /// <summary>
@@ -276,24 +287,36 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Clears all chains
+        /// Clears all chains (thread-safe)
         /// </summary>
         public void Clear()
         {
             _chains.Clear();
-            _stableChains.Clear();
-            _nextChainId = 1;
+            lock (_registryLock)
+            {
+                _stableChains.Clear();
+                _nextChainId = 1;
+            }
         }
 
         /// <summary>
-        /// Gets the total number of chains
+        /// Gets the total number of chains (thread-safe)
         /// </summary>
         public int Count => _chains.Count;
 
         /// <summary>
-        /// Gets the number of stable chains
+        /// Gets the number of stable chains (thread-safe)
         /// </summary>
-        public int StableCount => _stableChains.Count;
+        public int StableCount
+        {
+            get
+            {
+                lock (_registryLock)
+                {
+                    return _stableChains.Count;
+                }
+            }
+        }
     }
 
     /// <summary>

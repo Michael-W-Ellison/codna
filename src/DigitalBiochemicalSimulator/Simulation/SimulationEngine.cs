@@ -11,9 +11,11 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// <summary>
     /// Main simulation engine that orchestrates all subsystems.
     /// Based on section 4.1 main simulation loop of the design specification.
+    /// Implements IDisposable for proper resource cleanup.
     /// </summary>
-    public class SimulationEngine
+    public class SimulationEngine : IDisposable
     {
+        private bool _disposed = false;
         // Configuration
         public SimulationConfig Config { get; private set; }
 
@@ -332,6 +334,61 @@ namespace DigitalBiochemicalSimulator.Simulation
         public override string ToString()
         {
             return $"Simulation(Tick:{TickManager.CurrentTick}, Tokens:{ActiveTokens.Count}/{Config.MaxActiveTokens})";
+        }
+
+        /// <summary>
+        /// Disposes of all resources used by the simulation engine
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected dispose method
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Stop simulation
+                if (IsRunning)
+                {
+                    Stop();
+                }
+
+                // Clear and release all tokens
+                if (ActiveTokens != null)
+                {
+                    foreach (var token in ActiveTokens.ToList())
+                    {
+                        Grid?.RemoveToken(token);
+                        TokenPool?.ReleaseToken(token);
+                    }
+                    ActiveTokens.Clear();
+                }
+
+                // Clear all systems
+                TokenPool?.Clear();
+                Grid?.Clear();
+
+                // Clear thermal vents
+                ThermalVents?.Clear();
+            }
+
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Finalizer
+        /// </summary>
+        ~SimulationEngine()
+        {
+            Dispose(false);
         }
     }
 
