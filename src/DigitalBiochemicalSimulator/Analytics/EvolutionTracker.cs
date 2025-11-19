@@ -162,7 +162,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         private ChainPattern ExtractPattern(TokenChain chain)
         {
             if (chain == null || chain.Tokens == null)
-                return new ChainPattern();
+                return new ChainPattern { Hash = "" };
 
             var tokens = chain.Tokens.ToList();
             var typeSequence = tokens.Select(t => t.Type).ToList();
@@ -236,6 +236,9 @@ namespace DigitalBiochemicalSimulator.Analytics
 
                 foreach (var snapshot in _history)
                 {
+                    if (snapshot?.Pattern?.Hash == null)
+                        continue;
+
                     var hash = snapshot.Pattern.Hash;
                     if (!patternCounts.ContainsKey(hash))
                     {
@@ -285,7 +288,11 @@ namespace DigitalBiochemicalSimulator.Analytics
                     HighestStability = _lineages.Values.Any()
                         ? _lineages.Values.Max(l => l.PeakStability)
                         : 0,
-                    UniquePatterns = _history.Select(s => s.Pattern.Hash).Distinct().Count()
+                    UniquePatterns = _history
+                        .Where(s => s?.Pattern?.Hash != null)
+                        .Select(s => s.Pattern.Hash)
+                        .Distinct()
+                        .Count()
                 };
             }
         }
@@ -305,9 +312,10 @@ namespace DigitalBiochemicalSimulator.Analytics
                 // Data rows
                 foreach (var snapshot in _history.OrderBy(s => s.Tick))
                 {
+                    var patternHash = snapshot?.Pattern?.Hash ?? "";
                     csv.AppendLine($"{snapshot.ChainId},{snapshot.Tick},{snapshot.Length}," +
                                  $"{snapshot.Stability:F2},{snapshot.Fitness:F2}," +
-                                 $"\"{snapshot.Pattern.Hash}\"");
+                                 $"\"{patternHash}\"");
                 }
 
                 return csv.ToString();

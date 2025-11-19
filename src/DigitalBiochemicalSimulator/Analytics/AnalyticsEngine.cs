@@ -64,10 +64,13 @@ namespace DigitalBiochemicalSimulator.Analytics
             _timeSeriesTracker.RecordBatch(metrics, tick);
 
             // Record chain evolution
-            var chains = simulation.ChainRegistry.GetAllChains();
-            foreach (var chain in chains)
+            if (simulation.ChainRegistry != null)
             {
-                _evolutionTracker.RecordChainState(chain, tick);
+                var chains = simulation.ChainRegistry.GetAllChains();
+                foreach (var chain in chains)
+                {
+                    _evolutionTracker.RecordChainState(chain, tick);
+                }
             }
         }
 

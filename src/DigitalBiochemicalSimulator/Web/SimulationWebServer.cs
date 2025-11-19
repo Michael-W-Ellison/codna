@@ -176,11 +176,12 @@ namespace DigitalBiochemicalSimulator.Web
                     break;
 
                 case "/api/export/json":
-                    jsonResponse = _simulation.ExportAnalyticsToJSON();
+                    jsonResponse = _simulation?.ExportAnalyticsToJSON() ?? "{}";
                     break;
 
                 case "/api/export/csv":
-                    SendCSVResponse(_simulation.ExportAnalyticsToCSV(), response);
+                    var csvData = _simulation?.ExportAnalyticsToCSV() ?? "";
+                    SendCSVResponse(csvData, response);
                     return;
 
                 default:
@@ -197,17 +198,29 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private string GetStatus()
         {
+            if (_simulation == null)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    isRunning = false,
+                    isPaused = false,
+                    currentTick = 0,
+                    tps = 0.0,
+                    gridSize = new { width = 0, height = 0, depth = 0 }
+                });
+            }
+
             var data = new
             {
                 isRunning = _simulation.IsRunning,
-                isPaused = _simulation.TickManager.IsPaused,
-                currentTick = _simulation.TickManager.CurrentTick,
-                tps = _simulation.TickManager.ActualTicksPerSecond,
+                isPaused = _simulation.TickManager?.IsPaused ?? false,
+                currentTick = _simulation.TickManager?.CurrentTick ?? 0,
+                tps = _simulation.TickManager?.ActualTicksPerSecond ?? 0.0,
                 gridSize = new
                 {
-                    width = _simulation.Grid.Width,
-                    height = _simulation.Grid.Height,
-                    depth = _simulation.Grid.Depth
+                    width = _simulation.Grid?.Width ?? 0,
+                    height = _simulation.Grid?.Height ?? 0,
+                    depth = _simulation.Grid?.Depth ?? 0
                 }
             };
 
@@ -219,6 +232,9 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private string GetStatistics()
         {
+            if (_simulation == null)
+                return JsonSerializer.Serialize(new { });
+
             var stats = _simulation.GetStatistics();
             return JsonSerializer.Serialize(stats);
         }
@@ -228,6 +244,9 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private string GetDashboard()
         {
+            if (_simulation == null)
+                return JsonSerializer.Serialize(new { });
+
             var dashboard = _simulation.GetDashboardData();
             return JsonSerializer.Serialize(dashboard);
         }
@@ -237,6 +256,9 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private string GetGridData()
         {
+            if (_simulation?.Grid == null)
+                return JsonSerializer.Serialize(new { cells = new object[0] });
+
             var activeCells = _simulation.Grid.ActiveCells;
             var cellData = new System.Collections.Generic.List<object>();
 
@@ -271,6 +293,9 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private string GetChains()
         {
+            if (_simulation?.ChainRegistry == null)
+                return JsonSerializer.Serialize(new { chains = new object[0] });
+
             var chains = _simulation.ChainRegistry.GetAllChains();
             var chainData = chains.Select(c => new
             {
@@ -294,6 +319,16 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private string GetEvolution()
         {
+            if (_simulation?.Analytics?.Evolution == null)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    statistics = new { },
+                    topLineages = new object[0],
+                    commonPatterns = new object[0]
+                });
+            }
+
             var evolutionStats = _simulation.Analytics.Evolution.GetStatistics();
             var topLineages = _simulation.Analytics.Evolution.GetTopLineages(10);
             var patterns = _simulation.Analytics.Evolution.IdentifyCommonPatterns().Take(10);
