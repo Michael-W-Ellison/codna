@@ -99,7 +99,11 @@ namespace DigitalBiochemicalSimulator.Simulation
             // Grammar and Chemistry systems
             var grammarRules = GrammarLibrary.GetDefaultGrammar();
             BondRulesEngine = new BondRulesEngine(grammarRules);
-            BondStrengthCalculator = new BondStrengthCalculator(BondRulesEngine);
+            BondStrengthCalculator = new BondStrengthCalculator(
+                BondRulesEngine,
+                Config.CovalentBondStrength,
+                Config.IonicBondStrength,
+                Config.VanDerWaalsBondStrength);
             BondingManager = new BondingManager(BondRulesEngine, BondStrengthCalculator, Config, Grid);
             RepulsionHandler = new RepulsionHandler(Grid, BondRulesEngine);
             ChainStabilityCalculator = new ChainStabilityCalculator(BondRulesEngine, BondStrengthCalculator);

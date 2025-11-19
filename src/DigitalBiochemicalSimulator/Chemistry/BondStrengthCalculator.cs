@@ -18,10 +18,16 @@ namespace DigitalBiochemicalSimulator.Chemistry
     public class BondStrengthCalculator
     {
         private readonly BondRulesEngine _rulesEngine;
+        private readonly float _covalentMultiplier;
+        private readonly float _ionicMultiplier;
+        private readonly float _vanDerWaalsMultiplier;
 
-        public BondStrengthCalculator(BondRulesEngine rulesEngine)
+        public BondStrengthCalculator(BondRulesEngine rulesEngine, float covalentMultiplier = 1.0f, float ionicMultiplier = 1.0f, float vanDerWaalsMultiplier = 1.0f)
         {
             _rulesEngine = rulesEngine;
+            _covalentMultiplier = covalentMultiplier;
+            _ionicMultiplier = ionicMultiplier;
+            _vanDerWaalsMultiplier = vanDerWaalsMultiplier;
         }
 
         /// <summary>
@@ -68,7 +74,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Calculates bond strength from grammar rules
+        /// Calculates bond strength from grammar rules with bond type multipliers
         /// </summary>
         private float GetGrammarCompatibility(Token token1, Token token2)
         {
@@ -79,7 +85,20 @@ namespace DigitalBiochemicalSimulator.Chemistry
                 return 0.0f; // Grammar forbids this bond
 
             // Get the base strength from matching grammar rule
-            return _rulesEngine.GetBaseBondStrength(token1, token2);
+            float baseStrength = _rulesEngine.GetBaseBondStrength(token1, token2);
+
+            // Apply bond type multiplier based on the bond type
+            BondType bondType = _rulesEngine.GetBondType(token1, token2);
+            float multiplier = bondType switch
+            {
+                BondType.COVALENT => _covalentMultiplier,
+                BondType.IONIC => _ionicMultiplier,
+                BondType.VAN_DER_WAALS => _vanDerWaalsMultiplier,
+                _ => 1.0f
+            };
+
+            // Apply multiplier and clamp to valid range
+            return Math.Clamp(baseStrength * multiplier, 0.0f, 1.0f);
         }
 
         /// <summary>

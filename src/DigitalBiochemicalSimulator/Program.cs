@@ -314,17 +314,34 @@ namespace DigitalBiochemicalSimulator
             AnsiConsole.Clear();
             AnsiConsole.MarkupLine("[bold yellow]Full Integrated Simulation (GUI Mode)[/]\n");
 
-            var config = AnsiConsole.Prompt(
-                new SelectionPrompt<SimulationConfig>()
-                    .Title("[green]Select preset configuration:[/]")
-                    .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
+            var configChoice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("[green]Select configuration:[/]")
                     .AddChoices(new[] {
-                        SimulationPresets.Minimal,
-                        SimulationPresets.Standard,
-                        SimulationPresets.ExpressionEvolution,
-                        SimulationPresets.HarshSelection,
-                        SimulationPresets.RapidEvolution
+                        "Use Preset Configuration",
+                        "Custom Configuration (Advanced)"
                     }));
+
+            SimulationConfig config;
+
+            if (configChoice == "Custom Configuration (Advanced)")
+            {
+                config = CustomizeConfiguration();
+            }
+            else
+            {
+                config = AnsiConsole.Prompt(
+                    new SelectionPrompt<SimulationConfig>()
+                        .Title("[green]Select preset configuration:[/]")
+                        .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
+                        .AddChoices(new[] {
+                            SimulationPresets.Minimal,
+                            SimulationPresets.Standard,
+                            SimulationPresets.ExpressionEvolution,
+                            SimulationPresets.HarshSelection,
+                            SimulationPresets.RapidEvolution
+                        }));
+            }
 
             AnsiConsole.Clear();
             AnsiConsole.Status()
@@ -426,6 +443,215 @@ namespace DigitalBiochemicalSimulator
         }
 
         /// <summary>
+        /// Allows user to customize simulation configuration
+        /// </summary>
+        static SimulationConfig CustomizeConfiguration()
+        {
+            AnsiConsole.Clear();
+            AnsiConsole.MarkupLine("[bold cyan]Custom Configuration[/]\n");
+
+            // Start with a base preset
+            var basePreset = AnsiConsole.Prompt(
+                new SelectionPrompt<SimulationConfig>()
+                    .Title("[green]Start with preset as base:[/]")
+                    .UseConverter(c => GetPresetName(c))
+                    .AddChoices(new[] {
+                        SimulationPresets.Minimal,
+                        SimulationPresets.Standard,
+                        SimulationPresets.ExpressionEvolution,
+                        SimulationPresets.HarshSelection,
+                        SimulationPresets.RapidEvolution
+                    }));
+
+            var config = basePreset.Clone();
+
+            AnsiConsole.MarkupLine($"\n[yellow]Customizing configuration based on: {GetPresetName(basePreset)}[/]\n");
+
+            // Configuration categories to customize
+            var categories = AnsiConsole.Prompt(
+                new MultiSelectionPrompt<string>()
+                    .Title("[green]Select categories to customize:[/]")
+                    .NotRequired()
+                    .PageSize(10)
+                    .InstructionsText("[grey](Press [blue]space[/] to toggle, [green]enter[/] to accept)[/]")
+                    .AddChoices(new[] {
+                        "Bond Strengths (Covalent, Ionic, Van der Waals)",
+                        "Grid Dimensions",
+                        "Energy Parameters",
+                        "Damage Parameters",
+                        "Thermal Vents",
+                        "Performance Limits"
+                    }));
+
+            // Customize Bond Strengths
+            if (categories.Contains("Bond Strengths (Covalent, Ionic, Van der Waals)"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Bond Strength Multipliers ═══[/]");
+                AnsiConsole.MarkupLine("[dim]Multipliers adjust bond strength (1.0 = default from grammar)[/]\n");
+
+                config.CovalentBondStrength = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Covalent Bond Strength:[/]")
+                        .DefaultValue(config.CovalentBondStrength)
+                        .ValidationErrorMessage("[red]Must be between 0.1 and 5.0[/]")
+                        .Validate(v => v >= 0.1f && v <= 5.0f));
+
+                config.IonicBondStrength = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Ionic Bond Strength:[/]")
+                        .DefaultValue(config.IonicBondStrength)
+                        .ValidationErrorMessage("[red]Must be between 0.1 and 5.0[/]")
+                        .Validate(v => v >= 0.1f && v <= 5.0f));
+
+                config.VanDerWaalsBondStrength = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Van der Waals Bond Strength:[/]")
+                        .DefaultValue(config.VanDerWaalsBondStrength)
+                        .ValidationErrorMessage("[red]Must be between 0.1 and 5.0[/]")
+                        .Validate(v => v >= 0.1f && v <= 5.0f));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Bond strengths configured:");
+                AnsiConsole.MarkupLine($"  Covalent: [yellow]{config.CovalentBondStrength:F2}x[/]");
+                AnsiConsole.MarkupLine($"  Ionic: [yellow]{config.IonicBondStrength:F2}x[/]");
+                AnsiConsole.MarkupLine($"  Van der Waals: [yellow]{config.VanDerWaalsBondStrength:F2}x[/]");
+            }
+
+            // Customize Grid Dimensions
+            if (categories.Contains("Grid Dimensions"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Grid Dimensions ═══[/]\n");
+
+                config.GridWidth = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Grid Width:[/]")
+                        .DefaultValue(config.GridWidth)
+                        .ValidationErrorMessage("[red]Must be between 5 and 200[/]")
+                        .Validate(v => v >= 5 && v <= 200));
+
+                config.GridHeight = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Grid Height:[/]")
+                        .DefaultValue(config.GridHeight)
+                        .ValidationErrorMessage("[red]Must be between 5 and 200[/]")
+                        .Validate(v => v >= 5 && v <= 200));
+
+                config.GridDepth = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Grid Depth:[/]")
+                        .DefaultValue(config.GridDepth)
+                        .ValidationErrorMessage("[red]Must be between 5 and 200[/]")
+                        .Validate(v => v >= 5 && v <= 200));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Grid: [yellow]{config.GridWidth}×{config.GridHeight}×{config.GridDepth}[/]");
+            }
+
+            // Customize Energy Parameters
+            if (categories.Contains("Energy Parameters"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Energy Parameters ═══[/]\n");
+
+                config.InitialTokenEnergy = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Initial Token Energy:[/]")
+                        .DefaultValue(config.InitialTokenEnergy)
+                        .ValidationErrorMessage("[red]Must be between 10 and 500[/]")
+                        .Validate(v => v >= 10 && v <= 500));
+
+                config.EnergyPerTick = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Energy Loss Per Tick:[/]")
+                        .DefaultValue(config.EnergyPerTick)
+                        .ValidationErrorMessage("[red]Must be between 0 and 10[/]")
+                        .Validate(v => v >= 0 && v <= 10));
+
+                config.EnergyPerBond = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Energy Gain Per Bond:[/]")
+                        .DefaultValue(config.EnergyPerBond)
+                        .ValidationErrorMessage("[red]Must be between 0 and 20[/]")
+                        .Validate(v => v >= 0 && v <= 20));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Energy parameters configured");
+            }
+
+            // Customize Damage Parameters
+            if (categories.Contains("Damage Parameters"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Damage Parameters ═══[/]\n");
+
+                config.BaseDamageRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Base Damage Rate:[/]")
+                        .DefaultValue(config.BaseDamageRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 0.5[/]")
+                        .Validate(v => v >= 0.0f && v <= 0.5f));
+
+                config.DamageExponent = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Damage Exponent:[/]")
+                        .DefaultValue(config.DamageExponent)
+                        .ValidationErrorMessage("[red]Must be between 1.0 and 10.0[/]")
+                        .Validate(v => v >= 1.0f && v <= 10.0f));
+
+                config.CriticalDamageThreshold = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Critical Damage Threshold:[/]")
+                        .DefaultValue(config.CriticalDamageThreshold)
+                        .ValidationErrorMessage("[red]Must be between 0.5 and 1.0[/]")
+                        .Validate(v => v >= 0.5f && v <= 1.0f));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Damage parameters configured");
+            }
+
+            // Customize Thermal Vents
+            if (categories.Contains("Thermal Vents"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Thermal Vents ═══[/]\n");
+
+                config.NumberOfVents = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Number of Vents:[/]")
+                        .DefaultValue(config.NumberOfVents)
+                        .ValidationErrorMessage("[red]Must be between 1 and 20[/]")
+                        .Validate(v => v >= 1 && v <= 20));
+
+                config.VentEmissionRate = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Vent Emission Rate (ticks per token):[/]")
+                        .DefaultValue(config.VentEmissionRate)
+                        .ValidationErrorMessage("[red]Must be between 1 and 100[/]")
+                        .Validate(v => v >= 1 && v <= 100));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Thermal vents configured");
+            }
+
+            // Customize Performance Limits
+            if (categories.Contains("Performance Limits"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Performance Limits ═══[/]\n");
+
+                config.MaxActiveTokens = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Max Active Tokens:[/]")
+                        .DefaultValue(config.MaxActiveTokens)
+                        .ValidationErrorMessage("[red]Must be between 100 and 10000[/]")
+                        .Validate(v => v >= 100 && v <= 10000));
+
+                config.MaxChains = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Max Chains:[/]")
+                        .DefaultValue(config.MaxChains)
+                        .ValidationErrorMessage("[red]Must be between 10 and 1000[/]")
+                        .Validate(v => v >= 10 && v <= 1000));
+
+                config.TicksPerSecond = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Ticks Per Second:[/]")
+                        .DefaultValue(config.TicksPerSecond)
+                        .ValidationErrorMessage("[red]Must be between 1 and 100[/]")
+                        .Validate(v => v >= 1 && v <= 100));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Performance limits configured");
+            }
+
+            // Validate configuration
+            if (!config.Validate(out var errorMessage))
+            {
+                AnsiConsole.MarkupLine($"\n[red]⚠ Configuration validation failed: {errorMessage}[/]");
+                AnsiConsole.MarkupLine("[yellow]Reverting to base preset...[/]");
+                return basePreset;
+            }
+
+            AnsiConsole.MarkupLine("\n[green]✓ Custom configuration complete and validated![/]");
+            Thread.Sleep(1000);
+
+            return config;
+        }
+
+        /// <summary>
         /// Gets a friendly name for a preset configuration
         /// </summary>
         static string GetPresetName(SimulationConfig config)
@@ -446,17 +672,34 @@ namespace DigitalBiochemicalSimulator
             AnsiConsole.Clear();
             AnsiConsole.MarkupLine("[bold yellow]Full Integrated Simulation (Web Interface)[/]\n");
 
-            var config = AnsiConsole.Prompt(
-                new SelectionPrompt<SimulationConfig>()
-                    .Title("[green]Select preset configuration:[/]")
-                    .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
+            var configChoice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("[green]Select configuration:[/]")
                     .AddChoices(new[] {
-                        SimulationPresets.Minimal,
-                        SimulationPresets.Standard,
-                        SimulationPresets.ExpressionEvolution,
-                        SimulationPresets.HarshSelection,
-                        SimulationPresets.RapidEvolution
+                        "Use Preset Configuration",
+                        "Custom Configuration (Advanced)"
                     }));
+
+            SimulationConfig config;
+
+            if (configChoice == "Custom Configuration (Advanced)")
+            {
+                config = CustomizeConfiguration();
+            }
+            else
+            {
+                config = AnsiConsole.Prompt(
+                    new SelectionPrompt<SimulationConfig>()
+                        .Title("[green]Select preset configuration:[/]")
+                        .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
+                        .AddChoices(new[] {
+                            SimulationPresets.Minimal,
+                            SimulationPresets.Standard,
+                            SimulationPresets.ExpressionEvolution,
+                            SimulationPresets.HarshSelection,
+                            SimulationPresets.RapidEvolution
+                        }));
+            }
 
             var port = AnsiConsole.Ask<int>("[cyan]Web server port:[/]", 8080);
 
