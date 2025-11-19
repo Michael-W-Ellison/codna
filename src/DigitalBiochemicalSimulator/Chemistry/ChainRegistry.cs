@@ -38,7 +38,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
                 return -1;
 
             long id = _nextChainId++;
-            chain.Id = new Guid(); // Keep Guid for compatibility
+            chain.Id = id;
             _chains[id] = chain;
 
             return id;

@@ -11,7 +11,8 @@ namespace DigitalBiochemicalSimulator.Core
     public class Token
     {
         // Identity
-        public Guid Id { get; set; }
+        private static long _nextId = 0;
+        public long Id { get; set; }
         public TokenType Type { get; set; }
         public string Value { get; set; }
 
@@ -41,9 +42,12 @@ namespace DigitalBiochemicalSimulator.Core
         public bool IsRising => Energy > 0;
         public bool IsFalling => Energy <= 0;
 
-        public Token(TokenType type, string value, Vector3Int position)
+        /// <summary>
+        /// Constructor with explicit ID (for testing and controlled scenarios)
+        /// </summary>
+        public Token(long id, TokenType type, string value, Vector3Int position)
         {
-            Id = Guid.NewGuid();
+            Id = id;
             Type = type;
             Value = value;
             Position = position;
@@ -65,6 +69,14 @@ namespace DigitalBiochemicalSimulator.Core
             TicksSinceLastBond = 0;
 
             InitializeBondSites();
+        }
+
+        /// <summary>
+        /// Constructor with auto-generated ID (for production use)
+        /// </summary>
+        public Token(TokenType type, string value, Vector3Int position)
+            : this(System.Threading.Interlocked.Increment(ref _nextId), type, value, position)
+        {
         }
 
         /// <summary>

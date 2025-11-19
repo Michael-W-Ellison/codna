@@ -113,8 +113,9 @@ namespace DigitalBiochemicalSimulator.Utilities
         /// </summary>
         private void ResetToken(Token token, TokenType type, string value, Vector3Int position)
         {
-            // Reset identity
-            token.Id = Guid.NewGuid();
+            // Reset identity - create temporary token to get new auto-generated ID
+            var tempToken = new Token(type, value, position);
+            token.Id = tempToken.Id;
             token.Type = type;
             token.Value = value;
 
