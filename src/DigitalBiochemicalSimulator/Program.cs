@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
@@ -14,7 +15,7 @@ namespace DigitalBiochemicalSimulator
         static void Main(string[] args)
         {
             Console.WriteLine("===========================================");
-            Console.WriteLine("Digital Biochemical Simulator v1.0");
+            Console.WriteLine("Digital Biochemical Simulator v0.2.0");
             Console.WriteLine("===========================================");
             Console.WriteLine();
 
@@ -24,12 +25,44 @@ namespace DigitalBiochemicalSimulator
             Console.WriteLine("subject to biochemical and thermodynamic principles.");
             Console.WriteLine();
 
-            // Phase 1 Demo: Test core data structures
-            DemoPhase1();
+            // Show menu
+            ShowMenu();
+        }
 
-            Console.WriteLine();
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
+        static void ShowMenu()
+        {
+            while (true)
+            {
+                Console.WriteLine("--- Main Menu ---");
+                Console.WriteLine("1. Phase 1 Demo (Core Data Structures)");
+                Console.WriteLine("2. Phase 2 Demo (Physics Simulation)");
+                Console.WriteLine("3. Run Full Simulation");
+                Console.WriteLine("4. Exit");
+                Console.WriteLine();
+                Console.Write("Select option: ");
+
+                var input = Console.ReadLine();
+
+                switch (input)
+                {
+                    case "1":
+                        DemoPhase1();
+                        break;
+                    case "2":
+                        DemoPhase2();
+                        break;
+                    case "3":
+                        RunFullSimulation();
+                        break;
+                    case "4":
+                        return;
+                    default:
+                        Console.WriteLine("Invalid option. Try again.");
+                        break;
+                }
+
+                Console.WriteLine();
+            }
         }
 
         /// <summary>
@@ -116,6 +149,141 @@ namespace DigitalBiochemicalSimulator
 
             Console.WriteLine("Phase 1 implementation complete!");
             Console.WriteLine("Core data structures are working correctly.");
+        }
+
+        /// <summary>
+        /// Demonstrates Phase 2 physics simulation
+        /// </summary>
+        static void DemoPhase2()
+        {
+            Console.WriteLine("\n--- Phase 2: Physics Simulation Demo ---\n");
+
+            // Use minimal configuration for faster demo
+            var config = SimulationPresets.Minimal;
+            config.VentEmissionRate = 5; // Faster token generation
+            config.InitialTokenEnergy = 20; // Lower energy for faster cycles
+
+            Console.WriteLine("Creating simulation with Minimal preset...");
+            Console.WriteLine($"  Grid: {config.GridWidth}x{config.GridHeight}x{config.GridDepth}");
+            Console.WriteLine($"  Vent Emission Rate: every {config.VentEmissionRate} ticks");
+            Console.WriteLine($"  Initial Token Energy: {config.InitialTokenEnergy}");
+            Console.WriteLine($"  Max Active Tokens: {config.MaxActiveTokens}");
+            Console.WriteLine();
+
+            var simulation = new SimulationEngine(config);
+            simulation.Start();
+
+            Console.WriteLine("Simulation started! Running for 50 ticks...");
+            Console.WriteLine("Watch tokens being generated, rising, and falling!\n");
+
+            // Run for 50 ticks
+            for (int i = 0; i < 50; i++)
+            {
+                simulation.Update();
+
+                // Display stats every 10 ticks
+                if (i % 10 == 0)
+                {
+                    var stats = simulation.GetStatistics();
+                    Console.WriteLine($"[Tick {stats.CurrentTick}] " +
+                                    $"Tokens: {stats.ActiveTokenCount} | " +
+                                    $"Generated: {stats.TotalGenerated} | " +
+                                    $"Destroyed: {stats.TotalDestroyed} | " +
+                                    $"Avg Energy: {stats.AverageEnergy:F1}");
+                }
+
+                Thread.Sleep(50); // Small delay for readability
+            }
+
+            Console.WriteLine("\nFinal Statistics:");
+            var finalStats = simulation.GetStatistics();
+            Console.WriteLine($"  Total Tokens Generated: {finalStats.TotalGenerated}");
+            Console.WriteLine($"  Total Tokens Destroyed: {finalStats.TotalDestroyed}");
+            Console.WriteLine($"  Active Tokens: {finalStats.ActiveTokenCount}");
+            Console.WriteLine($"  Active Cells: {finalStats.ActiveCellCount}");
+            Console.WriteLine($"  Average Energy: {finalStats.AverageEnergy:F2}");
+
+            simulation.Stop();
+            Console.WriteLine("\nPhase 2 demo complete!");
+        }
+
+        /// <summary>
+        /// Runs full simulation with interactive controls
+        /// </summary>
+        static void RunFullSimulation()
+        {
+            Console.WriteLine("\n--- Full Simulation ---\n");
+
+            Console.WriteLine("Select preset:");
+            Console.WriteLine("1. Minimal (10x10x10, fast)");
+            Console.WriteLine("2. Standard (50x50x50, balanced)");
+            Console.WriteLine("3. Expression Evolution (optimized for math)");
+            Console.WriteLine("4. Harsh Selection (strong evolutionary pressure)");
+            Console.Write("\nChoice: ");
+
+            SimulationConfig config = Console.ReadLine() switch
+            {
+                "1" => SimulationPresets.Minimal,
+                "2" => SimulationPresets.Standard,
+                "3" => SimulationPresets.ExpressionEvolution,
+                "4" => SimulationPresets.HarshSelection,
+                _ => SimulationPresets.Standard
+            };
+
+            Console.WriteLine($"\nStarting simulation with {config.GridWidth}x{config.GridHeight}x{config.GridDepth} grid...");
+            Console.WriteLine("Press 'P' to pause/unpause, 'Q' to quit, 'S' for stats");
+            Console.WriteLine();
+
+            var simulation = new SimulationEngine(config);
+            simulation.Start();
+
+            bool running = true;
+            int ticksSinceLastDisplay = 0;
+
+            while (running)
+            {
+                // Update simulation
+                simulation.Update();
+                ticksSinceLastDisplay++;
+
+                // Display stats every 100 ticks
+                if (ticksSinceLastDisplay >= 100)
+                {
+                    var stats = simulation.GetStatistics();
+                    Console.WriteLine(stats.ToString());
+                    ticksSinceLastDisplay = 0;
+                }
+
+                // Check for user input (non-blocking)
+                if (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey(true).Key;
+                    switch (key)
+                    {
+                        case ConsoleKey.P:
+                            simulation.SetPaused(!simulation.TickManager.IsPaused);
+                            Console.WriteLine(simulation.TickManager.IsPaused ? "PAUSED" : "RESUMED");
+                            break;
+                        case ConsoleKey.S:
+                            var stats = simulation.GetStatistics();
+                            Console.WriteLine($"\n{stats}");
+                            Console.WriteLine($"  TPS: {simulation.TickManager.ActualTicksPerSecond:F2}");
+                            break;
+                        case ConsoleKey.Q:
+                            running = false;
+                            break;
+                    }
+                }
+
+                Thread.Sleep(10); // Small delay
+            }
+
+            simulation.Stop();
+            Console.WriteLine("\nSimulation stopped.");
+
+            var finalStats = simulation.GetStatistics();
+            Console.WriteLine("\nFinal Statistics:");
+            Console.WriteLine(finalStats.ToString());
         }
     }
 }
