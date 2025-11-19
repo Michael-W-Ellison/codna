@@ -1,0 +1,1636 @@
+# Code Biochemistry Simulation
+## Software Design Document v1.0
+
+---
+
+## 1. Executive Summary
+
+### 1.1 Project Overview
+This document specifies the design for a novel emergent complexity simulation that models programming language tokens as physical entities subject to thermodynamic principles, spatial dynamics, and chemical-like bonding rules. The simulation explores whether functional, semantically valid code structures can emerge from simple physical and grammatical rules.
+
+### 1.2 Core Concept
+Programming tokens exist as discrete entities in a 3D grid environment with physical properties (mass, energy, position). They interact according to:
+- Physical laws (gravity, energy, spatial constraints)
+- Grammatical rules (syntax validation, bond formation)
+- Biochemical metaphors (bond strength, electronegativity, stability)
+
+### 1.3 Project Goals
+- Demonstrate emergent code structure formation from simple rules
+- Explore evolutionary pressures on syntactic patterns
+- Investigate self-organizing properties of formal languages
+- Provide experimental platform for programming language research
+
+---
+
+## 2. System Architecture
+
+### 2.1 High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Presentation Layer                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ 3D Renderer  │  │ UI Controls  │  │  Statistics  │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  │
+└─────────────────────────────────────────────────────────┘
+                          ▲
+                          │
+┌─────────────────────────────────────────────────────────┐
+│                   Simulation Engine                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ Physics Sys  │  │ Grammar Sys  │  │  Bond System │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │  Token Pool  │  │  Grid System │  │  AST Validator│ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  │
+└─────────────────────────────────────────────────────────┘
+                          ▲
+                          │
+┌─────────────────────────────────────────────────────────┐
+│                     Data Layer                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ Token Data   │  │ Grammar Defs │  │  Config Data │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2.2 Module Breakdown
+
+#### 2.2.1 Core Simulation Engine
+- **Tick Manager**: Controls simulation time steps
+- **Event Queue**: Manages token interactions and state changes
+- **State Manager**: Maintains consistent simulation state
+
+#### 2.2.2 Physics System
+- **Motion Controller**: Handles token movement (rising/falling)
+- **Energy Manager**: Tracks and updates token energy levels
+- **Collision Detector**: Identifies token co-location events
+- **Gravity Simulator**: Implements downward pull and cell overflow
+
+#### 2.2.3 Grid System
+- **3D Cell Array**: Manages spatial partitioning
+- **Cell Manager**: Handles cell capacity and overflow
+- **Neighbor Resolver**: Identifies adjacent cells for displacement
+
+#### 2.2.4 Token System
+- **Token Pool**: Object pooling for performance
+- **Token Factory**: Creates tokens from thermal vent
+- **Token Lifecycle**: Manages token creation, bonding, destruction
+
+#### 2.2.5 Grammar System
+- **Language Definition**: Formal grammar specification
+- **Bond Rules Engine**: Determines token compatibility
+- **Bonding Site Manager**: Tracks available connection points
+- **AST Parser**: Validates token chain syntax and semantics
+
+#### 2.2.6 Bond Chemistry System
+- **Bond Strength Calculator**: Implements electronegativity model
+- **Stability Evaluator**: Determines chain stability
+- **Energy Calculator**: Computes bonding energy changes
+- **Repulsion Handler**: Manages mutually exclusive tokens
+
+#### 2.2.7 Damage System
+- **Altitude Damage**: Applies corruption based on height
+- **Metadata Corruptor**: Damages token metadata
+- **Chain Breaker**: Forcefully separates invalid bonds
+- **Repair Mechanism**: Attempts to find replacement tokens
+
+---
+
+## 3. Detailed Component Specifications
+
+### 3.1 Token Entity
+
+#### 3.1.1 Token Structure
+```
+Token {
+    // Identity
+    id: UUID
+    type: TokenType
+    value: string
+    
+    // Physical Properties
+    position: Vector3D (x, y, z)
+    mass: int (character count)
+    energy: int
+    velocity: Vector3D (directional movement)
+    
+    // Bonding Properties
+    bondSites: BondSite[]
+    bondedTokens: Token[]
+    chainHead: Token (null if not in chain)
+    chainPosition: int (position in chain)
+    
+    // Metadata (subject to damage)
+    metadata: {
+        syntaxCategory: string
+        semanticType: string
+        grammarRole: string
+        electronegativity: float
+        bondingCapacity: int
+    }
+    
+    // State
+    isActive: bool
+    isDamaged: bool
+    damageLevel: float (0.0 - 1.0)
+    stabilityScore: float
+    ticksSinceLastBond: int
+}
+```
+
+#### 3.1.2 Token Types
+```
+enum TokenType {
+    // Literals
+    INTEGER_LITERAL,
+    FLOAT_LITERAL,
+    STRING_LITERAL,
+    BOOLEAN_LITERAL,
+    
+    // Keywords
+    KEYWORD_IF,
+    KEYWORD_ELSE,
+    KEYWORD_WHILE,
+    KEYWORD_FOR,
+    KEYWORD_FUNCTION,
+    KEYWORD_CLASS,
+    KEYWORD_RETURN,
+    
+    // Type Keywords
+    TYPE_INT,
+    TYPE_FLOAT,
+    TYPE_STRING,
+    TYPE_BOOL,
+    
+    // Operators
+    OPERATOR_PLUS,
+    OPERATOR_MINUS,
+    OPERATOR_MULTIPLY,
+    OPERATOR_DIVIDE,
+    OPERATOR_ASSIGN,
+    OPERATOR_EQUALS,
+    OPERATOR_NOT_EQUALS,
+    OPERATOR_LESS_THAN,
+    OPERATOR_GREATER_THAN,
+    
+    // Structural
+    PAREN_OPEN,
+    PAREN_CLOSE,
+    BRACE_OPEN,
+    BRACE_CLOSE,
+    BRACKET_OPEN,
+    BRACKET_CLOSE,
+    
+    // Punctuation
+    SEMICOLON,
+    COMMA,
+    DOT,
+    
+    // Identifiers
+    IDENTIFIER,
+    
+    // Comments
+    COMMENT_SINGLE,
+    COMMENT_MULTI_START,
+    COMMENT_MULTI_END
+}
+```
+
+#### 3.1.3 Bond Site Structure
+```
+BondSite {
+    location: BondLocation (START, END, LEFT, RIGHT, INTERNAL)
+    isOccupied: bool
+    bondedTo: Token (null if unoccupied)
+    bondStrength: float
+    acceptedTypes: TokenType[]
+    grammarRule: GrammarRule
+}
+```
+
+### 3.2 Grid System
+
+#### 3.2.1 Grid Structure
+```
+Grid {
+    dimensions: Vector3D (width, height, depth)
+    cells: Cell[width][height][depth]
+    activeRegions: Set<Vector3D>
+}
+
+Cell {
+    position: Vector3D
+    tokens: List<Token>
+    totalMass: int
+    capacity: int (default 1000)
+    isOverflowing: bool
+}
+```
+
+#### 3.2.2 Cell Operations
+- **addToken(token)**: Add token, check capacity, trigger overflow
+- **removeToken(token)**: Remove token, update mass
+- **getLowestNeighbor()**: Find adjacent cell with lowest total mass
+- **distributeOverflow()**: Move excess tokens to neighbors
+
+### 3.3 Physics System
+
+#### 3.3.1 Energy Dynamics
+```
+Energy Rules:
+- New tokens spawn with energy = 50
+- Energy decreases by 1 per tick
+- Rising tokens: height += 1 per tick (costs 1 energy)
+- Falling tokens: height -= 1 per tick (no energy cost)
+- Energy = 0: token transitions to falling state
+
+Collision Rules:
+- Rising meets Sinking:
+  - Rising token loses 1 energy
+  - Sinking token displaced to random adjacent cell (1 of 8)
+  - Both continue in their respective directions
+```
+
+#### 3.3.2 Gravity System
+```
+Gravity Rules:
+- Tokens always seek lowest available position
+- Check 8 horizontal neighbors + 1 below (9 total)
+- If lower position available, move there
+- If current cell overflows, distribute to neighbors
+- Overflow priority: lowest mass neighbor first
+```
+
+#### 3.3.3 Motion Algorithm
+```
+updateTokenMotion(token):
+    if token.energy > 0:
+        // Rising phase
+        token.position.z += 1
+        token.energy -= 1
+        checkCellCapacity(token.position)
+        checkCollisions(token)
+    else:
+        // Falling phase
+        token.position.z -= 1
+        checkCellCapacity(token.position)
+        applyGravity(token)
+    
+    // Apply altitude damage
+    applyDamage(token, token.position.z)
+```
+
+### 3.4 Bond Chemistry System
+
+#### 3.4.1 Bond Strength Model
+```
+Bond Strength Categories:
+
+1. COVALENT (Strength: 0.9 - 1.0)
+   - Grammar-mandated pairs: ( ), { }, /* */
+   - Type-identifier declarations: int x
+   - Assignment structure: variable = expression
+   
+2. IONIC (Strength: 0.6 - 0.9)
+   - Keyword-context: if (...), while (...), function name(...)
+   - Operator-operand: x + y, a * b
+   - Member access: object.property
+   
+3. VAN_DER_WAALS (Strength: 0.1 - 0.6)
+   - Stylistic: statement ;
+   - Separators: parameter , parameter
+   - Whitespace conventions
+```
+
+#### 3.4.2 Electronegativity Values
+```
+Token Electronegativity (0.0 - 1.0):
+
+HIGH (0.8 - 1.0):
+- Type keywords (int, float, class)
+- Control keywords (if, while, for)
+- Assignment operator (=)
+
+MEDIUM (0.4 - 0.8):
+- Arithmetic operators (+, -, *, /)
+- Comparison operators (==, <, >)
+- Function calls
+
+LOW (0.0 - 0.4):
+- Identifiers
+- Literals
+- Punctuation
+```
+
+#### 3.4.3 Bonding Algorithm
+```
+attemptBond(token1, token2):
+    // Check if tokens are in same cell
+    if token1.position != token2.position:
+        return false
+    
+    // Find compatible bond sites
+    site1 = findAvailableBondSite(token1, token2.type)
+    site2 = findAvailableBondSite(token2, token1.type)
+    
+    if site1 == null or site2 == null:
+        return false
+    
+    // Check grammar compatibility
+    if !grammarAllowsBond(token1, token2, site1, site2):
+        return false
+    
+    // Calculate bond strength
+    strength = calculateBondStrength(token1, token2)
+    
+    // Check stability threshold
+    if strength < MIN_BOND_THRESHOLD:
+        return false
+    
+    // Form bond
+    createBond(token1, site1, token2, site2, strength)
+    
+    // Generate bonding energy
+    energyGain = (numTokensInChain - 1)
+    distributeEnergy(token1.chain, energyGain)
+    
+    return true
+```
+
+#### 3.4.4 Repulsion System
+```
+Repulsion Rules:
+- Tokens are mutually exclusive if they:
+  1. Perform similar functions (e.g., different loop keywords)
+  2. Cannot coexist in same syntactic context
+  3. Are marked as competing in grammar definition
+
+Repulsion Behavior:
+- When incompatible tokens enter same cell:
+  - Compare mass (including chain mass)
+  - Smaller token/chain displaced to random adjacent cell
+  - Larger token/chain remains
+  - Repulsion force proportional to electronegativity difference
+```
+
+### 3.5 Grammar System
+
+#### 3.5.1 Grammar Definition Format
+```
+GrammarRule {
+    id: string
+    pattern: TokenPattern[]
+    bondType: BondType
+    bondStrength: float
+    energyCost: int
+    validationLevel: ValidationLevel (IMMEDIATE, DELAYED, DEFERRED)
+}
+
+TokenPattern {
+    tokenType: TokenType
+    quantifier: Quantifier (ONE, OPTIONAL, ZERO_OR_MORE, ONE_OR_MORE)
+    constraints: Constraint[]
+}
+
+Constraint {
+    type: ConstraintType (TYPE_MATCH, VALUE_MATCH, SEMANTIC_COMPATIBILITY)
+    parameters: Map<string, any>
+}
+```
+
+#### 3.5.2 Example Grammar Rules
+```
+// Simple arithmetic expression grammar
+rules = [
+    {
+        id: "binary_expression",
+        pattern: [
+            {type: [INTEGER, FLOAT, IDENTIFIER], quantifier: ONE},
+            {type: [PLUS, MINUS, MULTIPLY, DIVIDE], quantifier: ONE},
+            {type: [INTEGER, FLOAT, IDENTIFIER], quantifier: ONE}
+        ],
+        bondType: IONIC,
+        bondStrength: 0.75,
+        validationLevel: DELAYED
+    },
+    {
+        id: "parenthesized_expression",
+        pattern: [
+            {type: PAREN_OPEN, quantifier: ONE},
+            {type: ANY_EXPRESSION, quantifier: ONE},
+            {type: PAREN_CLOSE, quantifier: ONE}
+        ],
+        bondType: COVALENT,
+        bondStrength: 0.95,
+        validationLevel: IMMEDIATE
+    },
+    {
+        id: "variable_declaration",
+        pattern: [
+            {type: [TYPE_INT, TYPE_FLOAT, TYPE_STRING], quantifier: ONE},
+            {type: IDENTIFIER, quantifier: ONE},
+            {type: OPERATOR_ASSIGN, quantifier: OPTIONAL},
+            {type: ANY_EXPRESSION, quantifier: OPTIONAL}
+        ],
+        bondType: COVALENT,
+        bondStrength: 0.90,
+        validationLevel: DELAYED
+    }
+]
+```
+
+#### 3.5.3 AST Validation
+```
+validateChain(tokenChain):
+    // Only validate if stability threshold met
+    if tokenChain.ticksSinceLastBond < STABILITY_THRESHOLD:
+        return VALIDATION_DEFERRED
+    
+    if tokenChain.length < MIN_VALIDATION_LENGTH:
+        return VALIDATION_DEFERRED
+    
+    // Build AST from token chain
+    ast = buildAST(tokenChain)
+    
+    if ast == null:
+        return VALIDATION_FAILED
+    
+    // Check syntax validity
+    syntaxValid = checkSyntax(ast, grammarRules)
+    
+    if !syntaxValid:
+        invalidTokens = findInvalidTokens(ast)
+        breakBonds(invalidTokens)
+        return VALIDATION_FAILED_SYNTAX
+    
+    // Check semantic validity
+    semanticValid = checkSemantics(ast)
+    
+    if !semanticValid:
+        incompatibleTokens = findTypeErrors(ast)
+        breakBonds(incompatibleTokens)
+        return VALIDATION_FAILED_SEMANTIC
+    
+    // Mark chain as stable
+    tokenChain.stabilityScore = calculateStability(ast)
+    return VALIDATION_PASSED
+```
+
+### 3.6 Damage System
+
+#### 3.6.1 Damage Model
+```
+Damage Calculation:
+- Base damage rate increases with altitude
+- Damage affects token metadata, not token identity
+- Accumulated damage increases probability of recognition failure
+
+damageRate(altitude) = BASE_DAMAGE * (altitude / MAX_HEIGHT)^DAMAGE_EXPONENT
+
+DAMAGE_EXPONENT values:
+- 1.0: Linear increase
+- 2.0: Quadratic increase (recommended)
+- 3.0: Cubic increase (harsh)
+```
+
+#### 3.6.2 Metadata Corruption
+```
+applyDamage(token, altitude):
+    damageChance = damageRate(altitude)
+    
+    if random() < damageChance:
+        // Corrupt random metadata field
+        field = selectRandomField(token.metadata)
+        
+        corruption_types = [
+            OBFUSCATION,    // Value becomes unreadable
+            MUTATION,       // Value changes to wrong type
+            ERASURE        // Value becomes null
+        ]
+        
+        corruptionType = selectWeightedRandom(corruption_types)
+        applyCorruption(token.metadata, field, corruptionType)
+        
+        token.isDamaged = true
+        token.damageLevel += DAMAGE_INCREMENT
+```
+
+#### 3.6.3 Bond Breaking and Repair
+```
+processDamagedToken(token):
+    if token.damageLevel > CRITICAL_DAMAGE_THRESHOLD:
+        // AST cannot recognize token
+        // Break all bonds
+        for bond in token.bonds:
+            breakBond(bond)
+            token.chainHead = null
+        
+        // Token enters free-floating state
+        token.isActive = false
+        return
+    
+    // Attempt repair
+    if token.isDamaged and token.bondedTokens.length > 0:
+        // AST attempts to re-validate chain
+        validationResult = validateChain(token.chainHead)
+        
+        if validationResult == VALIDATION_FAILED:
+            // Try to find replacement token
+            replacement = findReplacementToken(token, token.chainHead)
+            
+            if replacement != null:
+                // Swap tokens
+                transferBonds(token, replacement)
+                ejectToken(token)
+            else:
+                // Cannot repair, break chain
+                shortenChain(token.chainHead, token)
+```
+
+### 3.7 Thermal Vent System
+
+#### 3.7.1 Token Generation
+```
+ThermalVent {
+    position: Vector3D (bottom layer)
+    emissionRate: int (tokens per N ticks)
+    tokenDistribution: Map<TokenType, float> (probability weights)
+    initialEnergy: int (default 50)
+}
+
+generateToken():
+    if currentTick % emissionRate == 0:
+        tokenType = selectWeightedRandom(tokenDistribution)
+        token = new Token {
+            type: tokenType,
+            value: getDefaultValue(tokenType),
+            position: vent.position,
+            energy: initialEnergy,
+            mass: tokenType.value.length
+        }
+        
+        grid.addToken(token)
+        return token
+```
+
+#### 3.7.2 Token Distribution Profiles
+```
+// Balanced profile
+BALANCED_DISTRIBUTION = {
+    INTEGER_LITERAL: 0.15,
+    IDENTIFIER: 0.15,
+    OPERATORS: 0.20,
+    KEYWORDS: 0.15,
+    TYPES: 0.10,
+    STRUCTURAL: 0.15,
+    PUNCTUATION: 0.10
+}
+
+// Operator-heavy profile (complex expressions)
+EXPRESSION_HEAVY = {
+    INTEGER_LITERAL: 0.20,
+    IDENTIFIER: 0.15,
+    OPERATORS: 0.35,
+    STRUCTURAL: 0.20,
+    PUNCTUATION: 0.10
+}
+
+// Statement-heavy profile (control structures)
+CONTROL_HEAVY = {
+    IDENTIFIER: 0.20,
+    KEYWORDS: 0.30,
+    OPERATORS: 0.15,
+    TYPES: 0.15,
+    STRUCTURAL: 0.20
+}
+```
+
+---
+
+## 4. Algorithm Specifications
+
+### 4.1 Main Simulation Loop
+```
+simulationLoop():
+    while running:
+        currentTick++
+        
+        // 1. Generate new tokens
+        thermalVent.generateToken()
+        
+        // 2. Update all token physics
+        for token in activeTokens:
+            updateTokenMotion(token)
+            applyDamage(token)
+        
+        // 3. Process bonding opportunities
+        for cell in activeCells:
+            if cell.tokens.length > 1:
+                attemptBonding(cell.tokens)
+        
+        // 4. Process repulsion
+        for cell in activeCells:
+            checkRepulsion(cell.tokens)
+        
+        // 5. Validate stable chains
+        for chain in stableChains:
+            validateChain(chain)
+        
+        // 6. Apply gravity and redistribution
+        for cell in activeCells:
+            applyGravity(cell)
+            redistributeOverflow(cell)
+        
+        // 7. Remove dead tokens
+        removeInactiveTokens()
+        
+        // 8. Update statistics
+        updateMetrics()
+        
+        // 9. Render
+        renderFrame()
+        
+        sleep(TICK_DURATION)
+```
+
+### 4.2 Bonding Opportunity Detection
+```
+attemptBonding(tokensInCell):
+    // Collect all available bond sites
+    availableSites = []
+    
+    for token in tokensInCell:
+        for site in token.bondSites:
+            if !site.isOccupied:
+                availableSites.add({token, site})
+    
+    // Try to match compatible sites
+    for i in range(availableSites.length):
+        for j in range(i+1, availableSites.length):
+            site1 = availableSites[i]
+            site2 = availableSites[j]
+            
+            if areCompatible(site1, site2):
+                success = attemptBond(
+                    site1.token, 
+                    site2.token
+                )
+                
+                if success:
+                    // Remove bonded sites from available list
+                    availableSites.remove(site1)
+                    availableSites.remove(site2)
+                    break
+```
+
+### 4.3 Chain Management
+```
+TokenChain {
+    head: Token
+    tail: Token
+    length: int
+    totalMass: int
+    totalEnergy: int
+    stabilityScore: float
+    lastModifiedTick: int
+    isValid: bool
+}
+
+addTokenToChain(chain, newToken, bondSite):
+    // Update chain structure
+    if bondSite == chain.tail.END:
+        chain.tail.bondSite[END] = newToken
+        newToken.bondSite[START] = chain.tail
+        chain.tail = newToken
+    else if bondSite == chain.head.START:
+        chain.head.bondSite[START] = newToken
+        newToken.bondSite[END] = chain.head
+        chain.head = newToken
+    
+    // Update chain properties
+    chain.length++
+    chain.totalMass += newToken.mass
+    chain.lastModifiedTick = currentTick
+    
+    // Generate bonding energy
+    energyGain = chain.length - 1
+    distributeEnergy(chain, energyGain)
+    
+    // Mark all tokens with chain reference
+    newToken.chainHead = chain.head
+
+removeTokenFromChain(chain, token):
+    // Break bonds
+    if token.bondSite[START]:
+        token.bondSite[START].bondSite[END] = null
+    if token.bondSite[END]:
+        token.bondSite[END].bondSite[START] = null
+    
+    // Update chain
+    chain.length--
+    chain.totalMass -= token.mass
+    chain.lastModifiedTick = currentTick
+    
+    // If chain broken into pieces, create new chains
+    if token == chain.head or token == chain.tail:
+        // Simple case: end token removed
+        updateChainBoundaries(chain)
+    else:
+        // Chain split into two
+        splitChain(chain, token)
+```
+
+### 4.4 Stability Calculation
+```
+calculateStability(tokenChain):
+    stability = 1.0
+    
+    // Factor 1: Bond strength
+    avgBondStrength = 0
+    for bond in tokenChain.bonds:
+        avgBondStrength += bond.strength
+    avgBondStrength /= tokenChain.bonds.length
+    stability *= avgBondStrength
+    
+    // Factor 2: Grammar validity
+    if tokenChain.isValid:
+        stability *= 1.2
+    else:
+        stability *= 0.5
+    
+    // Factor 3: Age/consistency
+    ticksSinceModified = currentTick - tokenChain.lastModifiedTick
+    ageBonus = min(ticksSinceModified / 100.0, 0.5)
+    stability += ageBonus
+    
+    // Factor 4: Damage levels
+    avgDamage = 0
+    for token in tokenChain.tokens:
+        avgDamage += token.damageLevel
+    avgDamage /= tokenChain.length
+    stability *= (1.0 - avgDamage)
+    
+    // Factor 5: Energy reserves
+    energyRatio = tokenChain.totalEnergy / (tokenChain.length * 10.0)
+    stability *= min(energyRatio, 1.0)
+    
+    return clamp(stability, 0.0, 1.0)
+```
+
+---
+
+## 5. Configuration and Parameters
+
+### 5.1 Simulation Parameters
+```
+SimulationConfig {
+    // Grid
+    gridWidth: int = 50
+    gridHeight: int = 50
+    gridDepth: int = 50
+    cellCapacity: int = 1000
+    
+    // Physics
+    initialTokenEnergy: int = 50
+    energyPerTick: int = 1
+    riseRate: int = 1  // cells per tick
+    fallRate: int = 1  // cells per tick
+    gravityEnabled: bool = true
+    
+    // Thermal Vent
+    ventEmissionRate: int = 10  // ticks per token
+    ventPosition: Vector3D = (25, 25, 0)
+    tokenDistribution: TokenDistribution = BALANCED
+    
+    // Bonding
+    minBondStrength: float = 0.3
+    bondingRadius: int = 0  // same cell only
+    energyPerBond: int = 1  // per token in chain minus 1
+    
+    // Damage
+    baseDamageRate: float = 0.01
+    damageExponent: float = 2.0
+    criticalDamageThreshold: float = 0.8
+    damageIncrement: float = 0.1
+    
+    // Validation
+    minValidationLength: int = 3
+    stabilityThreshold: int = 10  // ticks without bonding
+    validationFrequency: int = 5  // check every N ticks
+    
+    // Performance
+    maxActiveTokens: int = 1000
+    maxChains: int = 200
+    tickDuration: int = 100  // milliseconds
+}
+```
+
+### 5.2 Language Configuration
+```
+LanguageConfig {
+    name: string
+    grammarRules: GrammarRule[]
+    tokenTypes: TokenType[]
+    bondStrengthMatrix: float[][]
+    electronegativityValues: Map<TokenType, float>
+    repulsionRules: RepulsionRule[]
+}
+
+// Example: Simple Arithmetic Language
+ARITHMETIC_LANGUAGE = {
+    name: "SimpleArithmetic",
+    tokenTypes: [
+        INTEGER_LITERAL,
+        FLOAT_LITERAL,
+        IDENTIFIER,
+        OPERATOR_PLUS,
+        OPERATOR_MINUS,
+        OPERATOR_MULTIPLY,
+        OPERATOR_DIVIDE,
+        OPERATOR_ASSIGN,
+        PAREN_OPEN,
+        PAREN_CLOSE,
+        SEMICOLON
+    ],
+    grammarRules: [
+        // Define valid token sequences
+    ],
+    bondStrengthMatrix: [
+        // Define strength between each token type pair
+    ]
+}
+```
+
+### 5.3 Experimental Presets
+```
+PRESET_MINIMAL {
+    // Small scale, simple language
+    gridSize: 10x10x10
+    emissionRate: 20
+    language: ARITHMETIC_LANGUAGE
+    maxTokens: 100
+}
+
+PRESET_STANDARD {
+    // Medium scale, moderate complexity
+    gridSize: 50x50x50
+    emissionRate: 10
+    language: IMPERATIVE_LANGUAGE
+    maxTokens: 500
+}
+
+PRESET_COMPLEX {
+    // Large scale, full language
+    gridSize: 100x100x100
+    emissionRate: 5
+    language: OBJECT_ORIENTED_LANGUAGE
+    maxTokens: 2000
+}
+
+PRESET_EXPRESSION_EVOLUTION {
+    // Optimize for mathematical expression formation
+    tokenDistribution: EXPRESSION_HEAVY
+    damageExponent: 1.5  // gentler damage
+    bondStrength: HIGH
+}
+
+PRESET_HARSH_SELECTION {
+    // Strong evolutionary pressure
+    damageExponent: 3.0
+    criticalDamage: 0.5
+    emissionRate: 20  // high competition
+}
+```
+
+---
+
+## 6. Data Structures and Storage
+
+### 6.1 Core Data Structures
+
+#### Token Storage
+```
+// Object pool for performance
+TokenPool {
+    availableTokens: Queue<Token>
+    activeTokens: Set<Token>
+    recycledTokens: Queue<Token>
+    
+    getToken(): Token
+    releaseToken(token): void
+    resetToken(token): void
+}
+```
+
+#### Spatial Indexing
+```
+// Efficient spatial queries
+SpatialIndex {
+    octree: Octree<Token>  // 3D spatial partitioning
+    activeCells: Set<Vector3D>
+    
+    getTokensInCell(position): List<Token>
+    getTokensInRadius(position, radius): List<Token>
+    getNearbyTokens(token): List<Token>
+}
+```
+
+#### Chain Registry
+```
+ChainRegistry {
+    activeChains: Map<UUID, TokenChain>
+    stableChains: Set<TokenChain>  // chains ready for validation
+    invalidChains: Queue<TokenChain>  // chains marked for breakdown
+    
+    registerChain(chain): void
+    unregisterChain(chain): void
+    promoteToStable(chain): void
+}
+```
+
+### 6.2 Serialization Format
+```
+// Save simulation state
+SimulationState {
+    version: string
+    timestamp: long
+    config: SimulationConfig
+    currentTick: long
+    
+    tokens: Token[]
+    chains: TokenChain[]
+    grid: CellState[]
+    
+    statistics: SimulationStatistics
+}
+
+// Export format: JSON or binary
+saveState(filename):
+    state = captureCurrentState()
+    serialize(state, format)
+    write(filename, serialized)
+
+loadState(filename):
+    data = read(filename)
+    state = deserialize(data)
+    restoreState(state)
+```
+
+---
+
+## 7. Visualization and UI
+
+### 7.1 3D Visualization Requirements
+
+#### Camera System
+- Free camera movement (WASD + mouse)
+- Follow specific token/chain
+- Preset viewpoints (top, side, thermal vent)
+- Zoom controls
+
+#### Rendering Layers
+```
+RenderLayers:
+1. Grid (optional wireframe)
+2. Tokens (colored by type or property)
+3. Bonds (lines connecting tokens)
+4. Chains (highlighted structures)
+5. Energy fields (heat map)
+6. Damage zones (altitude-based overlay)
+```
+
+#### Token Visualization
+```
+Token Appearance:
+- Shape: Based on token type
+  - Literals: Spheres
+  - Keywords: Cubes
+  - Operators: Pyramids
+  - Structural: Cylinders
+  
+- Color: Based on property
+  - Type category (default)
+  - Energy level (heat map)
+  - Damage level (red gradient)
+  - Chain membership (unified color)
+  - Electronegativity (blue to red)
+  
+- Size: Proportional to mass/importance
+- Transparency: Based on stability
+```
+
+#### Chain Visualization
+```
+Chain Appearance:
+- Connected by bezier curves or straight lines
+- Color indicates:
+  - Validity (green = valid, red = invalid, yellow = unvalidated)
+  - Stability score (brightness)
+- Highlight on hover
+- Display AST structure on selection
+```
+
+### 7.2 UI Components
+
+#### Control Panel
+```
+Controls:
+- Play/Pause/Step simulation
+- Simulation speed (0.1x to 10x)
+- Reset simulation
+- Load/Save state
+- Export statistics
+
+Parameters (runtime adjustable):
+- Emission rate
+- Damage rate
+- Bond strength multiplier
+- Gravity strength
+- Validation frequency
+```
+
+#### Statistics Panel
+```
+Real-time Metrics:
+- Current tick
+- Active tokens
+- Active chains
+- Average chain length
+- Longest chain
+- Valid chains percentage
+- Total energy in system
+- Tokens generated
+- Tokens destroyed
+- Bonds formed
+- Bonds broken
+
+Graphs:
+- Token population over time
+- Chain formation rate
+- Average stability over time
+- Energy distribution
+```
+
+#### Token Inspector
+```
+Select Token Display:
+- Token ID and type
+- Current position
+- Energy level
+- Mass
+- Damage level
+- Bonded tokens
+- Chain membership
+- Metadata state
+- Bond sites status
+```
+
+#### Chain Inspector
+```
+Select Chain Display:
+- Chain ID
+- Head/tail tokens
+- Length
+- Total mass
+- Total energy
+- Stability score
+- Is valid
+- AST representation
+- Code string (if valid)
+- Creation tick
+- Last modified tick
+```
+
+#### Grammar Editor
+```
+Interactive Grammar Definition:
+- Add/edit/remove token types
+- Define bond rules
+- Set electronegativity values
+- Configure repulsion rules
+- Test grammar validity
+- Import/export grammar files
+```
+
+---
+
+## 8. Performance Optimization
+
+### 8.1 Computational Optimizations
+
+#### Spatial Partitioning
+```
+Optimization Strategy:
+- Use octree for 3D spatial queries
+- Only process active cells (containing tokens)
+- Cache neighbor cell lookups
+- Batch process tokens by region
+```
+
+#### Event-Driven Processing
+```
+Event System:
+- Only trigger bonding checks on cell entry/exit
+- Lazy AST validation (deferred until stable)
+- Update only changed chains
+- Skip physics for bonded tokens (move as unit)
+```
+
+#### Object Pooling
+```
+Pooling Strategy:
+- Pre-allocate token objects
+- Reuse destroyed tokens
+- Pool bond objects
+- Cache AST nodes
+```
+
+#### Parallel Processing
+```
+Parallelization Opportunities:
+- Token physics updates (independent)
+- Bonding checks per cell (independent)
+- Chain validation (independent)
+- Render preparation (independent of simulation)
+
+Threading Model:
+- Main simulation thread
+- Physics update thread pool
+- Bonding/validation thread pool
+- Render thread
+```
+
+### 8.2 Memory Optimization
+
+#### Memory Budget
+```
+Estimated Memory Usage:
+- Token object: ~200 bytes
+- Chain object: ~100 bytes + (tokens * 8 bytes)
+- Cell object: ~50 bytes + (tokens * 8 bytes)
+- Grid (50³): ~31 MB for structure
+
+For 1000 active tokens:
+- Tokens: 200 KB
+- Chains (avg 5 tokens): 50 KB
+- Grid references: 8 KB
+- Total: ~32 MB (manageable)
+```
+
+#### Memory Management
+```
+Strategies:
+- Limit maximum active tokens
+- Destroy tokens below grid
+- Merge overlapping chains when beneficial
+- Compress inactive cell data
+- Stream historical data to disk
+```
+
+### 8.3 Rendering Optimization
+
+#### Level of Detail (LOD)
+```
+LOD System:
+- Close tokens: Full geometry + effects
+- Medium distance: Simple geometry
+- Far distance: Billboards/points
+- Very far: Culled entirely
+```
+
+#### Instancing
+```
+GPU Instancing:
+- Batch render identical token types
+- Single draw call for thousands of tokens
+- Update only instance matrices
+```
+
+#### Selective Rendering
+```
+Render Optimization:
+- Frustum culling
+- Occlusion culling
+- Render only visible cells
+- Skip rendering stable/inactive tokens (optional)
+```
+
+---
+
+## 9. Testing Strategy
+
+### 9.1 Unit Tests
+
+#### Physics System Tests
+```
+testTokenRising()
+testTokenFalling()
+testEnergyDepletion()
+testCollisionBehavior()
+testGravityApplication()
+testCellOverflow()
+```
+
+#### Bond System Tests
+```
+testBondFormation()
+testBondBreaking()
+testBondStrengthCalculation()
+testElectronegativityModel()
+testRepulsionBehavior()
+testEnergyGeneration()
+```
+
+#### Grammar System Tests
+```
+testTokenCompatibility()
+testASTConstruction()
+testSyntaxValidation()
+testSemanticValidation()
+testChainShortening()
+testTokenReplacement()
+```
+
+### 9.2 Integration Tests
+
+#### End-to-End Scenarios
+```
+testSimpleExpressionFormation()
+  - Spawn tokens: 5, +, 3
+  - Verify bond formation
+  - Validate resulting AST
+  - Check energy generation
+
+testChainStability()
+  - Create valid chain
+  - Apply damage
+  - Verify repair mechanism
+  - Confirm chain survives or fails gracefully
+
+testThermalVentCycle()
+  - Generate tokens continuously
+  - Monitor population equilibrium
+  - Verify token lifecycle
+  - Check performance metrics
+```
+
+### 9.3 Performance Tests
+
+#### Stress Tests
+```
+testMaxTokenLoad()
+  - Spawn maximum tokens
+  - Measure tick rate
+  - Monitor memory usage
+  - Verify stable performance
+
+testGridScaling()
+  - Test 10³, 50³, 100³ grids
+  - Measure performance impact
+  - Identify bottlenecks
+
+testLongRunning()
+  - Run for 100,000+ ticks
+  - Monitor memory leaks
+  - Verify state consistency
+```
+
+### 9.4 Scientific Validation Tests
+
+#### Emergent Behavior Tests
+```
+testExpressionEmergence()
+  - Run with expression-heavy tokens
+  - Measure valid expression formation rate
+  - Analyze complexity over time
+
+testEvolutionaryPressure()
+  - Compare different damage rates
+  - Analyze survival patterns
+  - Measure structural adaptation
+
+testGrammarOptimization()
+  - Test multiple grammar configurations
+  - Measure chain formation success
+  - Identify optimal bond strengths
+```
+
+---
+
+## 10. Development Roadmap
+
+### 10.1 Phase 1: Foundation (Months 1-2)
+
+#### Milestone 1.1: Core Architecture
+- Implement grid system
+- Create token entity structure
+- Build basic physics engine
+- Develop simple 2D visualization
+
+#### Milestone 1.2: Basic Bonding
+- Implement bond site system
+- Create simple grammar (arithmetic only)
+- Develop bonding algorithm
+- Add energy mechanics
+
+#### Milestone 1.3: Minimal Viable Simulation
+- Integrate thermal vent
+- Implement token lifecycle
+- Add collision detection
+- Create basic UI controls
+
+**Deliverable**: Working 2D prototype with arithmetic tokens
+
+### 10.2 Phase 2: Grammar System (Months 3-4)
+
+#### Milestone 2.1: Bond Chemistry
+- Implement electronegativity model
+- Create bond strength calculator
+- Add repulsion system
+- Develop stability metrics
+
+#### Milestone 2.2: AST Integration
+- Build AST parser
+- Implement grammar validator
+- Create chain management system
+- Add syntax error handling
+
+#### Milestone 2.3: Semantic Layer
+- Add type checking
+- Implement semantic validation
+- Create repair mechanisms
+- Add token replacement system
+
+**Deliverable**: Full grammar system with validation
+
+### 10.3 Phase 3: 3D Environment (Months 5-6)
+
+#### Milestone 3.1: 3D Physics
+- Upgrade to 3D grid
+- Implement 3D movement
+- Add altitude-based effects
+- Create gravity system
+
+#### Milestone 3.2: Damage System
+- Implement altitude damage
+- Create metadata corruption
+- Add chain breaking logic
+- Develop repair attempts
+
+#### Milestone 3.3: Advanced Visualization
+- Build 3D renderer
+- Create camera system
+- Add visual effects
+- Implement LOD system
+
+**Deliverable**: Full 3D simulation with damage
+
+### 10.4 Phase 4: Polish & Research (Months 7-8)
+
+#### Milestone 4.1: Optimization
+- Implement parallel processing
+- Add object pooling
+- Optimize rendering
+- Profile and tune
+
+#### Milestone 4.2: Configuration System
+- Create parameter UI
+- Build preset system
+- Add grammar editor
+- Implement save/load
+
+#### Milestone 4.3: Analysis Tools
+- Add comprehensive statistics
+- Create export functionality
+- Build analysis graphs
+- Develop research mode
+
+**Deliverable**: Production-ready simulation platform
+
+---
+
+## 11. Technology Stack Recommendations
+
+### 11.1 Programming Language
+**Primary: C# or C++**
+- C#: Easier development, Unity integration, good performance
+- C++: Maximum performance, full control, steeper learning curve
+
+**Alternative: Rust**
+- Excellent performance
+- Memory safety
+- Growing ecosystem
+- Steeper learning curve
+
+### 11.2 Game Engine / Framework
+
+#### Option 1: Unity (Recommended for Rapid Development)
+**Pros:**
+- Excellent 3D rendering
+- Built-in physics (can be adapted)
+- Strong UI system
+- Cross-platform
+- Large community
+
+**Cons:**
+- Some overhead
+- License considerations
+- May need custom physics
+
+#### Option 2: Unreal Engine
+**Pros:**
+- Outstanding graphics
+- Powerful tools
+- Blueprint visual scripting
+- Free for research
+
+**Cons:**
+- Heavier weight
+- Steeper learning curve
+- Overkill for this project
+
+#### Option 3: Custom Engine (OpenGL/Vulkan)
+**Pros:**
+- Complete control
+- Optimal performance
+- No licensing issues
+- Educational value
+
+**Cons:**
+- Significant development time
+- Must build all systems
+- Requires graphics expertise
+
+### 11.3 Parsing Libraries
+
+**ANTLR4** (Recommended)
+- Generate parser from grammar
+- Multi-language support
+- Excellent documentation
+- Industry standard
+
+**Tree-sitter**
+- Fast incremental parsing
+- Good error recovery
+- Growing ecosystem
+
+**Custom Parser**
+- Full control
+- Optimized for simulation
+- More development time
+
+### 11.4 Supporting Libraries
+
+#### Mathematics
+- GLM (C++): Vector/matrix operations
+- MathNet (C#): Numerical computing
+- Eigen (C++): Linear algebra
+
+#### Data Structures
+- Boost (C++): Advanced data structures
+- C# Collections: Built-in, sufficient
+
+#### Serialization
+- JSON: Easy debugging, human-readable
+- Protocol Buffers: Compact, fast
+- MessagePack: Balance of both
+
+#### UI
+- ImGui: Immediate mode, fast, programmer-friendly
+- Dear ImGui: Popular C++ choice
+- Unity UI: If using Unity
+
+---
+
+## 12. Risk Analysis and Mitigation
+
+### 12.1 Technical Risks
+
+#### Risk: Performance Degradation
+**Likelihood:** Medium
+**Impact:** High
+**Mitigation:**
+- Implement early profiling
+- Build performance tests from start
+- Use object pooling
+- Implement spatial partitioning early
+- Plan for parallel processing
+
+#### Risk: Grammar System Complexity
+**Likelihood:** High
+**Impact:** Medium
+**Mitigation:**
+- Start with minimal grammar
+- Incremental complexity
+- Extensive testing
+- Use established parsing libraries
+- Build grammar editor for experimentation
+
+#### Risk: Emergent Behavior Not Occurring
+**Likelihood:** Medium
+**Impact:** High
+**Mitigation:**
+- Tunable parameters from start
+- Multiple experimental presets
+- Iterative parameter refinement
+- Fallback to interesting simpler behaviors
+- Document partial successes
+
+### 12.2 Development Risks
+
+#### Risk: Scope Creep
+**Likelihood:** High
+**Impact:** Medium
+**Mitigation:**
+- Clear phase milestones
+- MVP first approach
+- Feature freeze periods
+- Regular scope reviews
+
+#### Risk: Visualization Complexity
+**Likelihood:** Medium
+**Impact:** Medium
+**Mitigation:**
+- Use game engine for rendering
+- Start with 2D visualization
+- Progressive enhancement
+- Separate rendering from simulation
+
+---
+
+## 13. Success Metrics
+
+### 13.1 Technical Metrics
+- Simulation runs at 30+ FPS with 1000 active tokens
+- Less than 1GB memory usage
+- Support for 50³ grid minimum
+- Token lifecycle complete in <10 seconds
+
+### 13.2 Functional Metrics
+- Valid code chains form regularly (>10% of time)
+- Chains survive >100 ticks average
+- Damage system causes gradual degradation
+- Grammar system catches >95% of invalid structures
+
+### 13.3 Research Metrics
+- Observable emergent patterns
+- Reproducible evolutionary behaviors
+- Parameter sensitivity documented
+- Novel code structures discovered
+
+---
+
+## 14. Future Extensions
+
+### 14.1 Enhanced Features
+- Multiple thermal vents with different distributions
+- Token mutations (random type changes)
+- Predator tokens (destroy other tokens)
+- Energy fields (zones with modified physics)
+- Quantum effects (probabilistic bonding)
+
+### 14.2 Advanced Grammar
+- Full programming language support
+- Multiple language simultaneous simulation
+- Language evolution (grammar modification)
+- Dialect emergence
+
+### 14.3 Analysis Tools
+- ML-based pattern recognition
+- Automatic parameter optimization
+- Fitness landscape visualization
+- Phylogenetic tree of code structures
+
+### 14.4 Interactive Features
+- User can inject specific tokens
+- Manual chain construction
+- Genetic algorithm integration
+- Tournament selection
+
+---
+
+## 15. Conclusion
+
+This simulation represents a novel intersection of formal language theory, artificial life, and emergent complexity. The design balances computational feasibility with scientific interest, creating a platform for genuine research into the self-organizing properties of computational structures.
+
+### Key Innovations
+1. Physical modeling of abstract computational entities
+2. Chemical bonding metaphor for syntax
+3. Evolutionary pressure on code structures
+4. Emergent complexity from simple rules
+
+### Expected Outcomes
+- Demonstration of code self-organization
+- Insights into syntactic stability
+- Novel understanding of grammar robustness
+- Platform for programming language research
+
+### Development Viability
+The project is **feasible** for a skilled development team over 6-8 months, with potential for significant scientific contribution and novel visualization of computational processes.
+
+---
+
+**Document Version:** 1.0  
+**Last Updated:** 2025-10-18  
+**Status:** Design Complete - Ready for Implementation
