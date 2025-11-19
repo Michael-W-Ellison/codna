@@ -135,8 +135,8 @@ namespace DigitalBiochemicalSimulator.Chemistry
             bool hasSpace1 = used1 < capacity1;
             bool hasSpace2 = used2 < capacity2;
 
-            if (!hasSpace1 || !hasSpace2)
-                return 0.0f; // No available sites
+            if (!hasSpace1 || !hasSpace2 || capacity1 == 0 || capacity2 == 0)
+                return 0.0f; // No available sites or invalid capacity
 
             // Calculate how "full" each token is
             float utilization1 = (float)used1 / capacity1;

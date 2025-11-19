@@ -183,6 +183,10 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// </summary>
         public bool PredictStability(TokenChain chain, long currentTick, int futureTicks)
         {
+            // Guard against invalid chains
+            if (chain == null || chain.Length == 0 || chain.Tokens == null || chain.Tokens.Count == 0)
+                return false;
+
             // Calculate current stability
             float currentStability = CalculateStability(chain, currentTick);
 
@@ -197,7 +201,13 @@ namespace DigitalBiochemicalSimulator.Chemistry
             // Recalculate stability with predictions
             float futureStability = currentStability;
             futureStability *= (1.0f - futureAvgDamage); // Damage factor
-            futureStability *= Math.Min(1.0f, (float)futureEnergy / (chain.Length * ENERGY_PER_TOKEN_REQUIRED)); // Energy factor
+
+            // Prevent division by zero
+            int requiredEnergy = chain.Length * ENERGY_PER_TOKEN_REQUIRED;
+            if (requiredEnergy > 0)
+            {
+                futureStability *= Math.Min(1.0f, (float)futureEnergy / requiredEnergy); // Energy factor
+            }
 
             return futureStability >= 0.3f;
         }

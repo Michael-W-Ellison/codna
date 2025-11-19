@@ -263,6 +263,13 @@ namespace DigitalBiochemicalSimulator.Core
         /// </summary>
         public void CalculateStability(long currentTick)
         {
+            // Guard against invalid chains
+            if (Length == 0 || Tokens == null || Tokens.Count == 0)
+            {
+                StabilityScore = 0.0f;
+                return;
+            }
+
             float stability = 1.0f;
 
             // Factor 1: Bond strength
@@ -291,7 +298,7 @@ namespace DigitalBiochemicalSimulator.Core
             stability *= (1.0f - avgDamage);
 
             // Factor 5: Energy reserves
-            float energyRatio = TotalEnergy / (Length * 10.0f);
+            float energyRatio = Length > 0 ? TotalEnergy / (Length * 10.0f) : 0.0f;
             stability *= Math.Min(energyRatio, 1.0f);
 
             StabilityScore = Math.Clamp(stability, 0.0f, 1.0f);
