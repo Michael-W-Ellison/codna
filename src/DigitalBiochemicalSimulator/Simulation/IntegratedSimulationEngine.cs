@@ -524,6 +524,156 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
+        /// Saves the current simulation state to a JSON file
+        /// </summary>
+        public void SaveToFile(string filePath, string description = "")
+        {
+            var state = CaptureState(description);
+            var json = System.Text.Json.JsonSerializer.Serialize(state, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+            System.IO.File.WriteAllText(filePath, json);
+        }
+
+        /// <summary>
+        /// Captures the current simulation state without saving to file
+        /// </summary>
+        public SimulationState CaptureState(string description = "")
+        {
+            var builder = new SimulationStateBuilder()
+                .WithMetadata(TickManager.CurrentTick, description)
+                .WithConfiguration(Config)
+                .WithTokens(ActiveTokens)
+                .WithGrid(Grid);
+
+            // Add chains if available
+            var allChains = ChainRegistry.GetAllChains();
+            if (allChains != null && allChains.Any())
+            {
+                builder.WithChains(allChains);
+            }
+
+            // Add statistics if available
+            var snapshot = Statistics.GetLatestSnapshot();
+            if (snapshot != null)
+            {
+                builder.WithStatistics(snapshot);
+            }
+
+            // Add custom metadata
+            builder.WithCustomData("TotalTokensGenerated", TotalTokensGenerated.ToString());
+            builder.WithCustomData("TotalTokensDestroyed", TotalTokensDestroyed.ToString());
+            builder.WithCustomData("TotalBondsFormed", TotalBondsFormed.ToString());
+            builder.WithCustomData("TotalBondsBroken", TotalBondsBroken.ToString());
+
+            return builder.Build();
+        }
+
+        /// <summary>
+        /// Loads a simulation state from a JSON file
+        /// NOTE: This creates a new simulation from the saved state.
+        /// The current simulation instance should be disposed after loading.
+        /// </summary>
+        public static IntegratedSimulationEngine LoadFromFile(string filePath)
+        {
+            if (!System.IO.File.Exists(filePath))
+            {
+                throw new System.IO.FileNotFoundException($"Simulation state file not found: {filePath}");
+            }
+
+            var json = System.IO.File.ReadAllText(filePath);
+            var state = System.Text.Json.JsonSerializer.Deserialize<SimulationState>(json);
+
+            if (state == null || !state.IsValid())
+            {
+                throw new InvalidOperationException("Invalid simulation state file");
+            }
+
+            return RestoreFromState(state);
+        }
+
+        /// <summary>
+        /// Restores a simulation from a captured state
+        /// </summary>
+        public static IntegratedSimulationEngine RestoreFromState(SimulationState state)
+        {
+            // Reconstruct configuration
+            var config = ReconstructConfig(state.Configuration);
+
+            // Create new simulation with the restored configuration
+            var simulation = new IntegratedSimulationEngine(config);
+
+            // Restore tokens
+            if (state.Tokens != null)
+            {
+                foreach (var tokenState in state.Tokens)
+                {
+                    var token = simulation.TokenFactory.CreateToken(
+                        tokenState.Type,
+                        tokenState.Value,
+                        new Vector3Int(tokenState.Position.X, tokenState.Position.Y, tokenState.Position.Z)
+                    );
+
+                    if (token != null)
+                    {
+                        token.Energy = tokenState.Energy;
+                        token.Velocity = new Vector3Int(tokenState.Velocity.X, tokenState.Velocity.Y, tokenState.Velocity.Z);
+                        token.IsActive = tokenState.IsActive;
+                        token.IsDamaged = tokenState.IsDamaged;
+                        token.DamageLevel = tokenState.DamageLevel;
+
+                        simulation.Grid.AddToken(token);
+                        simulation.ActiveTokens.Add(token);
+                    }
+                }
+            }
+
+            // Restore statistics counters from metadata
+            if (state.Metadata?.CustomData != null)
+            {
+                if (state.Metadata.CustomData.TryGetValue("TotalTokensGenerated", out var gen))
+                    simulation.TotalTokensGenerated = long.Parse(gen);
+                if (state.Metadata.CustomData.TryGetValue("TotalTokensDestroyed", out var dest))
+                    simulation.TotalTokensDestroyed = long.Parse(dest);
+                if (state.Metadata.CustomData.TryGetValue("TotalBondsFormed", out var formed))
+                    simulation.TotalBondsFormed = long.Parse(formed);
+                if (state.Metadata.CustomData.TryGetValue("TotalBondsBroken", out var broken))
+                    simulation.TotalBondsBroken = long.Parse(broken);
+            }
+
+            // Restore tick count
+            if (state.Metadata != null)
+            {
+                simulation.TickManager.SetCurrentTick(state.Metadata.CurrentTick);
+            }
+
+            // Note: Bonds/chains will need to be re-established through simulation
+            // This is intentional as the bonding state may depend on current positions
+
+            return simulation;
+        }
+
+        /// <summary>
+        /// Reconstructs a SimulationConfig from saved state
+        /// </summary>
+        private static SimulationConfig ReconstructConfig(SimulationConfigState configState)
+        {
+            // Start with a default config and override with saved values
+            var config = new SimulationConfig
+            {
+                GridWidth = configState.GridWidth,
+                GridHeight = configState.GridHeight,
+                GridDepth = configState.GridDepth,
+                CellCapacity = configState.CellCapacity,
+                MaxActiveTokens = configState.MaxTokens,
+                TicksPerSecond = configState.TicksPerSecond
+            };
+
+            return config;
+        }
+
+        /// <summary>
         /// Gets real-time dashboard data
         /// </summary>
         public DashboardData GetDashboardData()

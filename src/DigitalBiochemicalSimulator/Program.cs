@@ -52,6 +52,7 @@ namespace DigitalBiochemicalSimulator
                             "Run Full Simulation (Text Mode)",
                             "Run Full Simulation (GUI Mode)",
                             "Run Full Simulation (Web Interface) 🌐",
+                            "Load Saved Simulation 💾",
                             "Exit"
                         }));
 
@@ -71,6 +72,9 @@ namespace DigitalBiochemicalSimulator
                         break;
                     case "Run Full Simulation (Web Interface) 🌐":
                         RunFullSimulationWithWebInterface();
+                        break;
+                    case "Load Saved Simulation 💾":
+                        LoadAndRunSimulation();
                         break;
                     case "Exit":
                         return;
@@ -359,7 +363,9 @@ namespace DigitalBiochemicalSimulator
                 simulation.Start();
 
                 AnsiConsole.MarkupLine("[green]Simulation started![/]");
-                AnsiConsole.MarkupLine("[dim]Use keyboard controls to interact with the visualization[/]");
+                AnsiConsole.MarkupLine("[dim]Keyboard controls:[/]");
+                AnsiConsole.MarkupLine("[dim]  ↑/↓: Change layer | M: Toggle metrics | L: Toggle legend[/]");
+                AnsiConsole.MarkupLine("[dim]  P: Pause | S: Save | E: Export analytics | Q: Quit[/]");
                 Thread.Sleep(1000);
 
                 bool running = true;
@@ -406,6 +412,40 @@ namespace DigitalBiochemicalSimulator
                                 break;
                             case ConsoleKey.P:
                                 simulation.SetPaused(!simulation.TickManager.IsPaused);
+                                break;
+                            case ConsoleKey.S:
+                                // Save simulation
+                                try
+                                {
+                                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                                    var filename = $"simulation_save_{timestamp}.json";
+                                    simulation.SaveToFile(filename, $"Saved at tick {simulation.TickManager.CurrentTick}");
+                                    AnsiConsole.MarkupLine($"[green]✓ Saved to {filename}[/]");
+                                    Thread.Sleep(1000);
+                                }
+                                catch (Exception ex)
+                                {
+                                    AnsiConsole.MarkupLine($"[red]✗ Save failed: {ex.Message}[/]");
+                                    Thread.Sleep(2000);
+                                }
+                                break;
+                            case ConsoleKey.E:
+                                // Export analytics
+                                try
+                                {
+                                    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                                    var jsonFile = $"analytics_{timestamp}.json";
+                                    var csvFile = $"analytics_{timestamp}.csv";
+                                    System.IO.File.WriteAllText(jsonFile, simulation.ExportAnalyticsToJSON());
+                                    System.IO.File.WriteAllText(csvFile, simulation.ExportAnalyticsToCSV());
+                                    AnsiConsole.MarkupLine($"[green]✓ Exported to {jsonFile} and {csvFile}[/]");
+                                    Thread.Sleep(1000);
+                                }
+                                catch (Exception ex)
+                                {
+                                    AnsiConsole.MarkupLine($"[red]✗ Export failed: {ex.Message}[/]");
+                                    Thread.Sleep(2000);
+                                }
                                 break;
                             case ConsoleKey.Q:
                                 running = false;
@@ -938,6 +978,191 @@ namespace DigitalBiochemicalSimulator
                 AnsiConsole.Write(new Panel(statsTable)
                     .Header("[bold green]Final Statistics[/]")
                     .Expand());
+            }
+        }
+
+        /// <summary>
+        /// Loads and runs a saved simulation
+        /// </summary>
+        static void LoadAndRunSimulation()
+        {
+            AnsiConsole.Clear();
+            AnsiConsole.MarkupLine("[bold yellow]Load Saved Simulation[/]\n");
+
+            // Find all .json save files in current directory
+            var saveFiles = System.IO.Directory.GetFiles(".", "simulation_save_*.json")
+                .Select(f => System.IO.Path.GetFileName(f))
+                .OrderByDescending(f => f)
+                .ToList();
+
+            if (saveFiles.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[red]No saved simulations found![/]");
+                AnsiConsole.MarkupLine("[dim]Save files should be named 'simulation_save_*.json'[/]");
+                Thread.Sleep(2000);
+                return;
+            }
+
+            // Let user select a save file
+            var selectedFile = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("[green]Select a save file to load:[/]")
+                    .PageSize(10)
+                    .AddChoices(saveFiles.Concat(new[] { "[Cancel]" })));
+
+            if (selectedFile == "[Cancel]")
+                return;
+
+            try
+            {
+                AnsiConsole.Status()
+                    .Start("Loading simulation...", ctx =>
+                    {
+                        ctx.Spinner(Spinner.Known.Star);
+                        Thread.Sleep(500);
+                    });
+
+                var simulation = IntegratedSimulationEngine.LoadFromFile(selectedFile);
+
+                AnsiConsole.MarkupLine($"[green]✓ Loaded from {selectedFile}[/]");
+                AnsiConsole.MarkupLine($"[cyan]  Tick: {simulation.TickManager.CurrentTick}[/]");
+                AnsiConsole.MarkupLine($"[cyan]  Tokens: {simulation.ActiveTokens.Count}[/]");
+                Thread.Sleep(1000);
+
+                // Ask if they want GUI or just continue text mode
+                var mode = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("[green]How would you like to run this simulation?[/]")
+                        .AddChoices(new[] { "GUI Mode (with visualization)", "Continue in background" }));
+
+                if (mode == "GUI Mode (with visualization)")
+                {
+                    // Run with GUI
+                    var visualizer = new VisualizationEngine(simulation.Grid);
+                    simulation.Start();
+
+                    AnsiConsole.MarkupLine("[green]Simulation resumed![/]");
+                    AnsiConsole.MarkupLine("[dim]Keyboard controls:[/]");
+                    AnsiConsole.MarkupLine("[dim]  ↑/↓: Change layer | M: Toggle metrics | L: Toggle legend[/]");
+                    AnsiConsole.MarkupLine("[dim]  P: Pause | S: Save | E: Export analytics | Q: Quit[/]");
+                    Thread.Sleep(1000);
+
+                    bool running = true;
+                    int frameCount = 0;
+
+                    while (running)
+                    {
+                        simulation.Update();
+
+                        if (frameCount % 3 == 0)
+                        {
+                            try
+                            {
+                                visualizer.Render(simulation);
+                            }
+                            catch
+                            {
+                                visualizer.RenderSimple(simulation);
+                            }
+                        }
+
+                        frameCount++;
+
+                        if (Console.KeyAvailable)
+                        {
+                            var key = Console.ReadKey(true).Key;
+                            switch (key)
+                            {
+                                case ConsoleKey.UpArrow:
+                                    visualizer.IncrementLayer();
+                                    break;
+                                case ConsoleKey.DownArrow:
+                                    visualizer.DecrementLayer();
+                                    break;
+                                case ConsoleKey.M:
+                                    visualizer.ToggleMetrics();
+                                    break;
+                                case ConsoleKey.L:
+                                    visualizer.ToggleLegend();
+                                    break;
+                                case ConsoleKey.P:
+                                    simulation.SetPaused(!simulation.TickManager.IsPaused);
+                                    break;
+                                case ConsoleKey.S:
+                                    try
+                                    {
+                                        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                                        var filename = $"simulation_save_{timestamp}.json";
+                                        simulation.SaveToFile(filename, $"Saved at tick {simulation.TickManager.CurrentTick}");
+                                        AnsiConsole.MarkupLine($"[green]✓ Saved to {filename}[/]");
+                                        Thread.Sleep(1000);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        AnsiConsole.MarkupLine($"[red]✗ Save failed: {ex.Message}[/]");
+                                        Thread.Sleep(2000);
+                                    }
+                                    break;
+                                case ConsoleKey.E:
+                                    try
+                                    {
+                                        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                                        var jsonFile = $"analytics_{timestamp}.json";
+                                        var csvFile = $"analytics_{timestamp}.csv";
+                                        System.IO.File.WriteAllText(jsonFile, simulation.ExportAnalyticsToJSON());
+                                        System.IO.File.WriteAllText(csvFile, simulation.ExportAnalyticsToCSV());
+                                        AnsiConsole.MarkupLine($"[green]✓ Exported to {jsonFile} and {csvFile}[/]");
+                                        Thread.Sleep(1000);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        AnsiConsole.MarkupLine($"[red]✗ Export failed: {ex.Message}[/]");
+                                        Thread.Sleep(2000);
+                                    }
+                                    break;
+                                case ConsoleKey.Q:
+                                    running = false;
+                                    break;
+                            }
+                        }
+
+                        Thread.Sleep(16);
+                    }
+
+                    simulation.Stop();
+                }
+                else
+                {
+                    // Run in background for specified duration
+                    var duration = AnsiConsole.Ask<int>("[cyan]Run for how many ticks?[/]", 1000);
+
+                    simulation.Start();
+                    var startTick = simulation.TickManager.CurrentTick;
+
+                    while (simulation.TickManager.CurrentTick < startTick + duration)
+                    {
+                        simulation.Update();
+                        Thread.Sleep(100);
+                    }
+
+                    simulation.Stop();
+
+                    AnsiConsole.MarkupLine($"[green]✓ Simulation completed {duration} ticks[/]");
+                }
+
+                // Show final stats
+                var stats = simulation.GetStatistics();
+                AnsiConsole.MarkupLine($"\n[cyan]Final Stats:[/]");
+                AnsiConsole.MarkupLine($"  Tick: {stats.CurrentTick}");
+                AnsiConsole.MarkupLine($"  Active Tokens: {stats.ActiveTokenCount}");
+                AnsiConsole.MarkupLine($"  Chains: {stats.TotalChains} ({stats.StableChains} stable)");
+
+                simulation.Dispose();
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Failed to load simulation: {ex.Message}[/]");
+                Thread.Sleep(3000);
             }
         }
     }

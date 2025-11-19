@@ -144,6 +144,15 @@ namespace DigitalBiochemicalSimulator.Simulation
             SetTicksPerSecond(TicksPerSecond / factor);
         }
 
+        /// <summary>
+        /// Sets the current tick (used for loading saved simulations)
+        /// </summary>
+        public void SetCurrentTick(long tick)
+        {
+            CurrentTick = tick;
+            TotalTicksExecuted = tick;
+        }
+
         public override string ToString()
         {
             return $"Tick {CurrentTick} ({ActualTicksPerSecond:F1} TPS, Avg: {AverageTickDuration:F2}ms)";
