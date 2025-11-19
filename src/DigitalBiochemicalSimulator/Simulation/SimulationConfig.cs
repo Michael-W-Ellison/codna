@@ -163,6 +163,72 @@ namespace DigitalBiochemicalSimulator.Simulation
                 return false;
             }
 
+            if (NumberOfVents <= 0)
+            {
+                errorMessage = "Number of vents must be positive";
+                return false;
+            }
+
+            if (NumberOfVents > 100)
+            {
+                errorMessage = "Number of vents cannot exceed 100 (performance limit)";
+                return false;
+            }
+
+            if (VentEmissionRate <= 0)
+            {
+                errorMessage = "Vent emission rate must be positive";
+                return false;
+            }
+
+            if (EnergyPerTick < 0)
+            {
+                errorMessage = "Energy per tick cannot be negative";
+                return false;
+            }
+
+            if (EnergyPerBond < 0)
+            {
+                errorMessage = "Energy per bond cannot be negative";
+                return false;
+            }
+
+            if (RiseRate <= 0)
+            {
+                errorMessage = "Rise rate must be positive";
+                return false;
+            }
+
+            if (FallRate <= 0)
+            {
+                errorMessage = "Fall rate must be positive";
+                return false;
+            }
+
+            if (MutationRange < 0)
+            {
+                errorMessage = "Mutation range cannot be negative";
+                return false;
+            }
+
+            if (MutationRate < 0)
+            {
+                errorMessage = "Mutation rate cannot be negative";
+                return false;
+            }
+
+            if (DamageExponent < 0)
+            {
+                errorMessage = "Damage exponent cannot be negative";
+                return false;
+            }
+
+            if (MaxChains < 0)
+            {
+                errorMessage = "Max chains cannot be negative";
+                return false;
+            }
+
             errorMessage = null;
             return true;
         }
