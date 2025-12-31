@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Biochemical Simulator - 3D Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e1a;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        #container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            grid-template-rows: 60px 1fr 40px;
+            height: 100vh;
+            gap: 10px;
+            padding: 10px;
+        }
+
+        #header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        #header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        #status {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .stat-item {
+            background: rgba(255,255,255,0.1);
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #canvas-container {
+            background: #1a1f2e;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        #sidebar {
+            background: #1a1f2e;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        #footer {
+            grid-column: 1 / -1;
+            background: #1a1f2e;
+            border-radius: 10px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+            color: #667eea;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .metric-box {
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #a0a0a0;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .chain-item {
+            background: rgba(118, 75, 162, 0.1);
+            border: 1px solid rgba(118, 75, 162, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .chain-id {
+            font-size: 12px;
+            color: #a0a0a0;
+        }
+
+        .chain-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 13px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #667eea;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0e1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 4px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-running {
+            background: #4ade80;
+            box-shadow: 0 0 10px #4ade80;
+        }
+
+        .status-paused {
+            background: #fbbf24;
+            box-shadow: 0 0 10px #fbbf24;
+        }
+
+        .status-stopped {
+            background: #ef4444;
+            box-shadow: 0 0 10px #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <h1>🧬 Digital Biochemical Simulator</h1>
+            <div id="status">
+                <div class="stat-item">
+                    <span class="status-indicator" id="status-indicator"></span>
+                    <span id="status-text">Connecting...</span>
+                </div>
+                <div class="stat-item">
+                    Tick: <strong id="tick-count">0</strong>
+                </div>
+                <div class="stat-item">
+                    TPS: <strong id="tps-value">0</strong>
+                </div>
+            </div>
+        </div>
+
+        <div id="canvas-container">
+            <div class="loading" id="loading">Initializing 3D View...</div>
+        </div>
+
+        <div id="sidebar">
+            <div class="section">
+                <div class="section-title">Simulation Metrics</div>
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-label">Tokens</div>
+                        <div class="metric-value" id="tokens">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Chains</div>
+                        <div class="metric-value" id="chains">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Stable</div>
+                        <div class="metric-value" id="stable">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Energy</div>
+                        <div class="metric-value" id="energy">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Evolution</div>
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-label">Lineages</div>
+                        <div class="metric-value" id="lineages">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Patterns</div>
+                        <div class="metric-value" id="patterns">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Longest</div>
+                        <div class="metric-value" id="longest">0</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Fitness</div>
+                        <div class="metric-value" id="fitness">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Top Chains</div>
+                <div id="chains-list">
+                    <div style="text-align: center; color: #666; padding: 20px;">
+                        No chains yet
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Export Data</div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="exportJSON()">JSON</button>
+                    <button onclick="exportCSV()">CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="footer">
+            <div id="controls">
+                <button onclick="togglePause()">⏯ Pause/Resume</button>
+                <button onclick="resetView()">🔄 Reset View</button>
+            </div>
+            <div style="font-size: 12px; color: #666;">
+                Use mouse to rotate • Scroll to zoom • Right-click to pan
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // API Configuration
+        const API_BASE = 'http://localhost:8080/api';
+        const UPDATE_INTERVAL = 1000; // Update every second
+
+        // Three.js Setup
+        let scene, camera, renderer, controls;
+        let tokenMeshes = [];
+        let gridHelper;
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            const loading = document.getElementById('loading');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0e1a);
+            scene.fog = new THREE.Fog(0x0a0e1a, 50, 200);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                75,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(30, 30, 30);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 2);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(50, 50, 50);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            // Grid Helper
+            gridHelper = new THREE.GridHelper(50, 50, 0x667eea, 0x333344);
+            scene.add(gridHelper);
+
+            // Handle resize
+            window.addEventListener('resize', onWindowResize);
+
+            loading.style.display = 'none';
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function resetView() {
+            camera.position.set(30, 30, 30);
+            controls.reset();
+        }
+
+        // API Functions
+        async function fetchAPI(endpoint) {
+            try {
+                const response = await fetch(`${API_BASE}/${endpoint}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        async function updateStatus() {
+            const data = await fetchAPI('status');
+            if (data) {
+                const indicator = document.getElementById('status-indicator');
+                const statusText = document.getElementById('status-text');
+
+                if (data.isRunning && !data.isPaused) {
+                    indicator.className = 'status-indicator status-running';
+                    statusText.textContent = 'Running';
+                } else if (data.isPaused) {
+                    indicator.className = 'status-indicator status-paused';
+                    statusText.textContent = 'Paused';
+                } else {
+                    indicator.className = 'status-indicator status-stopped';
+                    statusText.textContent = 'Stopped';
+                }
+
+                document.getElementById('tick-count').textContent = data.currentTick.toLocaleString();
+                document.getElementById('tps-value').textContent = data.tps.toFixed(1);
+            }
+        }
+
+        async function updateStats() {
+            const data = await fetchAPI('stats');
+            if (data) {
+                document.getElementById('tokens').textContent = data.activeTokenCount;
+                document.getElementById('chains').textContent = data.totalChains;
+                document.getElementById('stable').textContent = data.stableChains;
+                document.getElementById('energy').textContent = Math.round(data.totalEnergy);
+            }
+        }
+
+        async function updateEvolution() {
+            const data = await fetchAPI('evolution');
+            if (data && data.statistics) {
+                document.getElementById('lineages').textContent = data.statistics.totalLineages;
+                document.getElementById('patterns').textContent = data.statistics.uniquePatterns;
+                document.getElementById('longest').textContent = data.statistics.longestLineage;
+                document.getElementById('fitness').textContent = data.statistics.highestStability.toFixed(2);
+            }
+        }
+
+        async function updateChainsList() {
+            const data = await fetchAPI('chains');
+            if (data && data.chains) {
+                const list = document.getElementById('chains-list');
+                if (data.chains.length === 0) {
+                    list.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No chains yet</div>';
+                } else {
+                    list.innerHTML = data.chains.slice(0, 5).map(chain => `
+                        <div class="chain-item">
+                            <div class="chain-id">Chain #${chain.id}</div>
+                            <div class="chain-stats">
+                                <span>Length: ${chain.length}</span>
+                                <span>Stability: ${chain.stability.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        async function updateGrid() {
+            const data = await fetchAPI('grid');
+            if (data && data.cells) {
+                // Remove old meshes
+                tokenMeshes.forEach(mesh => scene.remove(mesh));
+                tokenMeshes = [];
+
+                // Add new meshes
+                data.cells.forEach(cell => {
+                    const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: getTokenColor(cell.tokens[0]?.type),
+                        emissive: getTokenColor(cell.tokens[0]?.type),
+                        emissiveIntensity: 0.2
+                    });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    mesh.position.set(cell.x - 25, cell.z, cell.y - 25);
+                    scene.add(mesh);
+                    tokenMeshes.push(mesh);
+                });
+            }
+        }
+
+        function getTokenColor(type) {
+            const colors = {
+                'INTEGER_LITERAL': 0x3b82f6,
+                'FLOAT_LITERAL': 0x06b6d4,
+                'STRING_LITERAL': 0xfbbf24,
+                'IDENTIFIER': 0x22c55e,
+                'OPERATOR_PLUS': 0xef4444,
+                'OPERATOR_MINUS': 0xef4444,
+                'OPERATOR_MULTIPLY': 0xa855f7,
+                'OPERATOR_DIVIDE': 0xa855f7,
+                'KEYWORD_IF': 0xf97316,
+                'KEYWORD_ELSE': 0xf97316,
+                'KEYWORD_WHILE': 0xf97316,
+                'KEYWORD_FOR': 0xf97316
+            };
+            return colors[type] || 0x64748b;
+        }
+
+        function exportJSON() {
+            window.open(`${API_BASE}/export/json`, '_blank');
+        }
+
+        function exportCSV() {
+            window.open(`${API_BASE}/export/csv`, '_blank');
+        }
+
+        function togglePause() {
+            // Implemented via simulation control
+            console.log('Pause/Resume functionality requires simulation control API');
+        }
+
+        // Update Loop
+        function startUpdateLoop() {
+            setInterval(async () => {
+                await updateStatus();
+                await updateStats();
+                await updateEvolution();
+                await updateChainsList();
+                await updateGrid();
+            }, UPDATE_INTERVAL);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initThreeJS();
+            startUpdateLoop();
+            // Initial update
+            setTimeout(() => {
+                updateStatus();
+                updateStats();
+                updateEvolution();
+                updateChainsList();
+                updateGrid();
+            }, 100);
+        });
+    </script>
+</body>
+</html>
