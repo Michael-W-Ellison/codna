@@ -297,6 +297,9 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var chain = new TokenChain(tokens[0]);
             for (int i = 1; i < tokens.Count; i++)
             {
+                // TokenChain.AddToken only accepts tokens bonded to the chain end
+                tokens[i - 1].BondedTokens.Add(tokens[i]);
+                tokens[i].BondedTokens.Add(tokens[i - 1]);
                 chain.AddToken(tokens[i]);
             }
 

@@ -39,7 +39,7 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
             simulation.Start();
             for (int i = 0; i < 10; i++)
             {
-                simulation.Update();
+                simulation.Step(); // Update() only ticks once the tick duration has elapsed
             }
             simulation.Stop();
 
@@ -91,12 +91,13 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
         [Fact]
         public void IntegratedSimulation_AppliesDamage_AtHighAltitude()
         {
-            // Arrange
+            // Arrange - damage certain at the top layer so the result does not depend on chance
             var config = SimulationConfig.CreateStandard();
+            config.BaseDamageRate = 1.0f;
             var simulation = new IntegratedSimulationEngine(config);
 
             // Create token at high altitude
-            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(5, config.GridHeight - 1, 5))
+            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(5, 5, config.GridDepth - 1))
             {
                 Energy = 50,
                 IsActive = true,
@@ -182,7 +183,7 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
             simulation.Start();
             for (int i = 0; i < 50; i++)
             {
-                simulation.Update();
+                simulation.Step(); // Update() only ticks once the tick duration has elapsed
             }
             simulation.Stop();
 

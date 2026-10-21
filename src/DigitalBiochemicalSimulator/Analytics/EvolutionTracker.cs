@@ -46,7 +46,9 @@ namespace DigitalBiochemicalSimulator.Analytics
                     BirthTick = tick,
                     Pattern = ExtractPattern(chain),
                     Length = chain.Length,
+                    PeakLength = chain.Length,
                     InitialStability = chain.StabilityScore,
+                    PeakStability = chain.StabilityScore,
                     ParentIds = new List<long>() // Will be populated if chain merges
                 };
 
@@ -92,7 +94,6 @@ namespace DigitalBiochemicalSimulator.Analytics
                 // Update lineage if exists
                 if (_lineages.TryGetValue(chain.Id, out var lineage))
                 {
-                    lineage.DeathTick = tick; // Update last seen
                     lineage.PeakStability = Math.Max(lineage.PeakStability, chain.StabilityScore);
                     lineage.PeakLength = Math.Max(lineage.PeakLength, chain.Length);
                 }

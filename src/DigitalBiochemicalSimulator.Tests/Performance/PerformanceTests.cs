@@ -17,6 +17,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
     /// Performance and stress tests for the simulation.
     /// Tests large-scale scenarios, memory usage, and execution speed.
     /// </summary>
+    [Collection("Performance")]
     public class PerformanceTests
     {
         private readonly ITestOutputHelper _output;
@@ -211,16 +212,20 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
             var grid = new Grid(config.GridWidth, config.GridHeight, config.GridDepth);
             var tokens = new List<Token>();
 
-            // Create clustered tokens that can bond
+            // Create clustered tokens that can bond (alternating operands and operators)
             for (int i = 0; i < 100; i++)
             {
                 var position = new Vector3Int(15, 15, 15); // All at same position
-                var token = new Token(i, TokenType.INTEGER_LITERAL, i.ToString(), position)
+                bool isOperand = i % 2 == 0;
+                var token = new Token(i, isOperand ? TokenType.INTEGER_LITERAL : TokenType.OPERATOR_PLUS,
+                    isOperand ? i.ToString() : "+", position)
                 {
                     Energy = 100,
                     Mass = 5
                 };
-                token.Metadata = new TokenMetadata("literal", "int", "operand", 0.5f, 3);
+                token.Metadata = isOperand
+                    ? new TokenMetadata("literal", "int", "operand", 0.5f, 3)
+                    : new TokenMetadata("operator", "arithmetic", "binary_operator", 0.6f, 2);
                 tokens.Add(token);
                 grid.AddToken(token);
             }

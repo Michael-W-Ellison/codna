@@ -101,8 +101,9 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
         {
             // Arrange
             var registry = CreateRegistry();
-            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero);
-            var chain = new TokenChain(token) { Id = 1 };
+            // Energy keeps the chain above the unstable threshold (chains with no energy are removed)
+            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero) { Energy = 100 };
+            var chain = new TokenChain(token) { Id = 1, StabilityScore = 0.0f };
             registry.RegisterChain(chain);
 
             // Act
@@ -112,6 +113,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             var retrievedChain = registry.GetChain(chain.Id);
             // Stability should have been calculated (exact value depends on calculator)
             Assert.NotNull(retrievedChain);
+            Assert.True(retrievedChain.StabilityScore > 0.0f);
         }
 
         [Fact]

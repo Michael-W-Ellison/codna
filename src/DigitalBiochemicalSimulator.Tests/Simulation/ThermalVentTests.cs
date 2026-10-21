@@ -54,18 +54,17 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             var factory = CreateFactory();
             var vent = new ThermalVent(position, factory, emissionRate: 10, initialEnergy: 100);
 
-            // Act - Try to generate tokens rapidly
+            // Act - Try to generate a token on every tick from 1 to 30
             int generated = 0;
-            for (int i = 0; i < 20; i++)
+            for (int i = 1; i <= 30; i++)
             {
                 var token = vent.GenerateToken(currentTick: i);
                 if (token != null)
                     generated++;
             }
 
-            // Assert - Should respect emission rate (not generate every tick)
-            Assert.True(generated >= 2); // Should generate at least a couple
-            Assert.True(generated <= 20); // But not more than ticks
+            // Assert - One token every 10 ticks (ticks 10, 20 and 30)
+            Assert.Equal(3, generated);
         }
 
         [Fact]

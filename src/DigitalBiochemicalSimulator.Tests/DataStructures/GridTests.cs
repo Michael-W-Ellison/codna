@@ -37,7 +37,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         }
 
         [Fact]
-        public void Grid_AddToken_RespectsCellCapacity()
+        public void Grid_AddToken_AllowsOverflowBeyondCellCapacity()
         {
             // Arrange
             var grid = new Grid(10, 10, 10, cellCapacity: 2);
@@ -50,10 +50,14 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
             bool result2 = grid.AddToken(token2);
             bool result3 = grid.AddToken(token3);
 
-            // Assert
+            // Assert - cells accept overflow; GravitySimulator.HandleOverflow spills it to neighbors
             Assert.True(result1);
             Assert.True(result2);
-            Assert.False(result3); // Should fail due to capacity
+            Assert.True(result3);
+            var cell = grid.GetCell(new Vector3Int(5, 5, 5));
+            Assert.NotNull(cell);
+            Assert.True(cell.IsOverflowing);
+            Assert.False(cell.CanAcceptToken(new Token(4, TokenType.INTEGER_LITERAL, "4", new Vector3Int(5, 5, 5))));
         }
 
         [Fact]

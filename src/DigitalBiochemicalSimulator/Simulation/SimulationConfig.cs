@@ -135,7 +135,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             // Validate positive dimensions
             if (GridWidth <= 0 || GridHeight <= 0 || GridDepth <= 0)
             {
-                errorMessage = "Grid dimensions must be positive";
+                errorMessage = $"Grid width, height, and depth must be positive (current: {GridWidth}×{GridHeight}×{GridDepth})";
                 return false;
             }
 
@@ -143,7 +143,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             const int MAX_DIMENSION = 1000;
             if (GridWidth > MAX_DIMENSION || GridHeight > MAX_DIMENSION || GridDepth > MAX_DIMENSION)
             {
-                errorMessage = $"Grid dimensions cannot exceed {MAX_DIMENSION} (current: {GridWidth}×{GridHeight}×{GridDepth})";
+                errorMessage = $"Grid is too large: dimensions cannot exceed {MAX_DIMENSION} (current: {GridWidth}×{GridHeight}×{GridDepth})";
                 return false;
             }
 

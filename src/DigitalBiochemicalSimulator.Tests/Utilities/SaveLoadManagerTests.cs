@@ -1,4 +1,5 @@
 using Xunit;
+using DigitalBiochemicalSimulator.Tests.TestHelpers;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
@@ -382,8 +383,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
             var token2 = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
 
-            var chain = new TokenChain(token1);
-            chain.AddToken(token2, atTail: true);
+            var chain = TestChains.Build(token1, token2);
             chain.StabilityScore = 0.85f;
             chain.IsValid = true;
 
@@ -408,9 +408,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
                 new Token(3, TokenType.INTEGER_LITERAL, "3", new Vector3Int(5, 5, 5))
             };
 
-            var chain = new TokenChain(tokens[0]);
-            chain.AddToken(tokens[1], atTail: true);
-            chain.AddToken(tokens[2], atTail: true);
+            var chain = TestChains.Build(tokens[0], tokens[1], tokens[2]);
 
             var grid = new Grid(10, 10, 10);
 

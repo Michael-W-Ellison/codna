@@ -196,7 +196,7 @@ namespace DigitalBiochemicalSimulator.Tests.Presets
             var duration = SimulationPresets.GetRecommendedDuration("InvalidPresetName");
 
             // Assert
-            Assert.Equal(1000, duration); // Default value
+            Assert.Equal(5000, duration); // Default value
         }
 
         [Fact]

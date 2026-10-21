@@ -185,9 +185,8 @@ namespace DigitalBiochemicalSimulator.Web
                     return;
 
                 default:
-                    response.StatusCode = 404;
-                    jsonResponse = JsonSerializer.Serialize(new { error = "Endpoint not found" });
-                    break;
+                    SendJSONResponse(JsonSerializer.Serialize(new { error = "Endpoint not found" }), response, statusCode: 404);
+                    return;
             }
 
             SendJSONResponse(jsonResponse, response);
@@ -346,18 +345,18 @@ namespace DigitalBiochemicalSimulator.Web
         /// <summary>
         /// Sends JSON response
         /// </summary>
-        private void SendJSONResponse(string json, HttpListenerResponse response)
+        private void SendJSONResponse(string? json, HttpListenerResponse response, int statusCode = 200)
         {
             if (json == null)
             {
-                response.StatusCode = 500;
+                statusCode = 500;
                 json = JsonSerializer.Serialize(new { error = "Internal server error" });
             }
 
             var buffer = Encoding.UTF8.GetBytes(json);
             response.ContentType = "application/json";
             response.ContentLength64 = buffer.Length;
-            response.StatusCode = 200;
+            response.StatusCode = statusCode;
             response.OutputStream.Write(buffer, 0, buffer.Length);
             response.Close();
         }
