@@ -64,7 +64,7 @@ namespace DigitalBiochemicalSimulator.Grammar
             }
 
             // Step 3: Grammar validation (from chain's built-in validation)
-            var grammarResult = chain.Validate();
+            var grammarResult = chain.ValidateChain();
             result.GrammarValid = grammarResult.IsValid;
             result.GrammarErrors = grammarResult.Errors;
 

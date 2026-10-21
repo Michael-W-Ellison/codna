@@ -60,7 +60,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Selects a random token type based on weighted distribution
         /// </summary>
-        private TokenType SelectWeightedRandom Token()
+        private TokenType SelectWeightedRandomToken()
         {
             if (TokenDistribution.Count == 0)
                 return TokenType.IDENTIFIER;

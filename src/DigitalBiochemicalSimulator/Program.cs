@@ -8,6 +8,7 @@ using DigitalBiochemicalSimulator.Simulation;
 using DigitalBiochemicalSimulator.Visualization;
 using DigitalBiochemicalSimulator.Web;
 using DigitalBiochemicalSimulator.Grammar;
+using Grid = DigitalBiochemicalSimulator.DataStructures.Grid;
 
 namespace DigitalBiochemicalSimulator
 {
@@ -42,7 +43,7 @@ namespace DigitalBiochemicalSimulator
                 AnsiConsole.Write(
                     new FigletText("Digital Biochemical Simulator")
                         .Centered()
-                        .Color(Color.Cyan));
+                        .Color(Color.Aqua));
 
                 var choice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
@@ -345,7 +346,7 @@ namespace DigitalBiochemicalSimulator
                             SimulationPresets.Standard,
                             SimulationPresets.ExpressionEvolution,
                             SimulationPresets.HarshSelection,
-                            SimulationPresets.RapidEvolution
+                            Presets.SimulationPresets.RapidEvolution()
                         }));
             }
 
@@ -506,7 +507,7 @@ namespace DigitalBiochemicalSimulator
                         SimulationPresets.Standard,
                         SimulationPresets.ExpressionEvolution,
                         SimulationPresets.HarshSelection,
-                        SimulationPresets.RapidEvolution
+                        Presets.SimulationPresets.RapidEvolution()
                     }));
 
             var config = basePreset.Clone();
@@ -722,13 +723,12 @@ namespace DigitalBiochemicalSimulator
                 var mutationFalloffChoice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("[cyan]Mutation Falloff Pattern:[/]")
-                        .AddChoices(new[] { "Gradual", "Sharp", "None" }));
+                        .AddChoices(new[] { "Gradual", "Abrupt" }));
 
                 config.MutationFalloff = mutationFalloffChoice switch
                 {
                     "Gradual" => MutationFalloff.Gradual,
-                    "Sharp" => MutationFalloff.Sharp,
-                    "None" => MutationFalloff.None,
+                    "Abrupt" => MutationFalloff.Abrupt,
                     _ => MutationFalloff.Gradual
                 };
 
@@ -896,7 +896,7 @@ namespace DigitalBiochemicalSimulator
                             SimulationPresets.Standard,
                             SimulationPresets.ExpressionEvolution,
                             SimulationPresets.HarshSelection,
-                            SimulationPresets.RapidEvolution
+                            Presets.SimulationPresets.RapidEvolution()
                         }));
             }
 
@@ -932,7 +932,7 @@ namespace DigitalBiochemicalSimulator
                              $"[dim]Press any key to stop the simulation...[/]"))
                 {
                     Header = new PanelHeader("[bold cyan]🌐 Web Interface Active[/]"),
-                    BorderColor = Color.Cyan,
+                    BorderStyle = new Style(Color.Aqua),
                     Padding = new Padding(2, 1, 2, 1)
                 };
 
@@ -1181,7 +1181,7 @@ namespace DigitalBiochemicalSimulator
             AnsiConsole.Write(
                 new FigletText("Chain Analysis")
                     .Centered()
-                    .Color(Color.Cyan));
+                    .Color(Color.Aqua));
 
             var analysis = simulation.GetLatestAnalysis();
 
@@ -1267,8 +1267,8 @@ namespace DigitalBiochemicalSimulator
                     AnsiConsole.WriteLine();
                     AnsiConsole.Write(new Panel(selectedChain.GetDetailedReport())
                         .Header($"[bold cyan]Chain {chainId}[/]")
-                        .Border(TableBorder.Rounded)
-                        .BorderColor(Color.Cyan));
+                        .Border(BoxBorder.Rounded)
+                        .BorderColor(Color.Aqua));
 
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine("[dim]Press any key to continue...[/]");

@@ -4,6 +4,7 @@ using Xunit;
 using DigitalBiochemicalSimulator.Analytics;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.Chemistry;
+using DigitalBiochemicalSimulator.DataStructures;
 
 namespace DigitalBiochemicalSimulator.Tests.Analytics
 {

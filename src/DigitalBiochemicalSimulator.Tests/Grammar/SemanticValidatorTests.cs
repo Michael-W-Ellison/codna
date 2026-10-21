@@ -109,7 +109,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var validator = new SemanticValidator();
 
             // Create "int x = 5"
-            var tokenInt = new Token(1, TokenType.KEYWORD_INT, "int", Vector3Int.Zero);
+            var tokenInt = new Token(1, TokenType.TYPE_INT, "int", Vector3Int.Zero);
             var tokenX = new Token(2, TokenType.IDENTIFIER, "x", Vector3Int.Zero);
             var tokenEq = new Token(3, TokenType.OPERATOR_ASSIGN, "=", Vector3Int.Zero);
             var token5 = new Token(4, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
@@ -271,9 +271,9 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
 
             // Create "if ( true )"
             var tokenIf = new Token(1, TokenType.KEYWORD_IF, "if", Vector3Int.Zero);
-            var tokenLParen = new Token(2, TokenType.LPAREN, "(", Vector3Int.Zero);
+            var tokenLParen = new Token(2, TokenType.PAREN_OPEN, "(", Vector3Int.Zero);
             var tokenTrue = new Token(3, TokenType.BOOLEAN_LITERAL, "true", Vector3Int.Zero);
-            var tokenRParen = new Token(4, TokenType.RPAREN, ")", Vector3Int.Zero);
+            var tokenRParen = new Token(4, TokenType.PAREN_CLOSE, ")", Vector3Int.Zero);
 
             var chain = new TokenChain(tokenIf);
             chain.AddToken(tokenLParen, atTail: true);

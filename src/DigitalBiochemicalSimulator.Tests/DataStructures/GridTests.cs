@@ -10,7 +10,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_Creation_InitializesCorrectly()
         {
             // Arrange & Act
-            var grid = new Grid(10, 20, 5, capacity: 3);
+            var grid = new Grid(10, 20, 5, cellCapacity: 3);
 
             // Assert
             Assert.Equal(10, grid.Width);
@@ -24,7 +24,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_AddToken_AddsToCorrectCell()
         {
             // Arrange
-            var grid = new Grid(10, 10, 10, capacity: 3);
+            var grid = new Grid(10, 10, 10, cellCapacity: 3);
             var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(5, 5, 5));
 
             // Act
@@ -40,7 +40,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_AddToken_RespectsCellCapacity()
         {
             // Arrange
-            var grid = new Grid(10, 10, 10, capacity: 2);
+            var grid = new Grid(10, 10, 10, cellCapacity: 2);
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "1", new Vector3Int(5, 5, 5));
             var token2 = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(5, 5, 5));
             var token3 = new Token(3, TokenType.INTEGER_LITERAL, "3", new Vector3Int(5, 5, 5));
@@ -60,7 +60,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_RemoveToken_RemovesFromCell()
         {
             // Arrange
-            var grid = new Grid(10, 10, 10, capacity: 3);
+            var grid = new Grid(10, 10, 10, cellCapacity: 3);
             var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(5, 5, 5));
             grid.AddToken(token);
 
@@ -76,7 +76,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_GetCell_ReturnsCorrectCell()
         {
             // Arrange
-            var grid = new Grid(10, 10, 10, capacity: 3);
+            var grid = new Grid(10, 10, 10, cellCapacity: 3);
             var position = new Vector3Int(5, 5, 5);
 
             // Act
@@ -91,7 +91,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_GetNeighbors_Returns9Neighbors()
         {
             // Arrange
-            var grid = new Grid(10, 10, 10, capacity: 3);
+            var grid = new Grid(10, 10, 10, cellCapacity: 3);
             var position = new Vector3Int(5, 5, 5);
 
             // Act
@@ -105,14 +105,14 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Grid_BoundaryCheck_WorksCorrectly()
         {
             // Arrange
-            var grid = new Grid(10, 10, 10, capacity: 3);
+            var grid = new Grid(10, 10, 10, cellCapacity: 3);
 
             // Act & Assert
-            Assert.True(grid.IsInBounds(new Vector3Int(0, 0, 0)));
-            Assert.True(grid.IsInBounds(new Vector3Int(9, 9, 9)));
-            Assert.False(grid.IsInBounds(new Vector3Int(-1, 0, 0)));
-            Assert.False(grid.IsInBounds(new Vector3Int(10, 0, 0)));
-            Assert.False(grid.IsInBounds(new Vector3Int(0, 20, 0)));
+            Assert.True(grid.IsValidPosition(new Vector3Int(0, 0, 0)));
+            Assert.True(grid.IsValidPosition(new Vector3Int(9, 9, 9)));
+            Assert.False(grid.IsValidPosition(new Vector3Int(-1, 0, 0)));
+            Assert.False(grid.IsValidPosition(new Vector3Int(10, 0, 0)));
+            Assert.False(grid.IsValidPosition(new Vector3Int(0, 20, 0)));
         }
     }
 }

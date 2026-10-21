@@ -188,6 +188,7 @@ namespace DigitalBiochemicalSimulator.Utilities
                 site.BreakBond();
             }
             token.ChainHead = null;
+            token.ChainId = 0;
             token.ChainPosition = 0;
 
             // Reset state

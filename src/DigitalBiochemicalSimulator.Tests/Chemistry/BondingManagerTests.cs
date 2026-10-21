@@ -238,7 +238,8 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             grid.AddToken(token2);
 
             // Act
-            var result = manager.ProcessCellBonding(cell, currentTick: 0);
+            var cellProcessor = new CellProcessor(manager, new RepulsionHandler(grid, rulesEngine), config);
+            var result = cellProcessor.ProcessCell(cell, currentTick: 0);
 
             // Assert
             Assert.NotNull(result);

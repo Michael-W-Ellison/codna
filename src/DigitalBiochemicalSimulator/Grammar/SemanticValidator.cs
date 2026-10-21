@@ -125,9 +125,9 @@ namespace DigitalBiochemicalSimulator.Grammar
                 var token = chain.Tokens[i];
 
                 // Check for variable declarations (e.g., "int x = 5")
-                if (token.Type == TokenType.KEYWORD_INT ||
-                    token.Type == TokenType.KEYWORD_FLOAT ||
-                    token.Type == TokenType.KEYWORD_BOOL)
+                if (token.Type == TokenType.TYPE_INT ||
+                    token.Type == TokenType.TYPE_FLOAT ||
+                    token.Type == TokenType.TYPE_BOOL)
                 {
                     if (i + 1 < chain.Tokens.Count)
                     {
@@ -197,7 +197,7 @@ namespace DigitalBiochemicalSimulator.Grammar
                 if (token.Type == TokenType.KEYWORD_IF || token.Type == TokenType.KEYWORD_WHILE)
                 {
                     // Check for condition (should have parentheses)
-                    if (i + 1 >= chain.Tokens.Count || chain.Tokens[i + 1].Type != TokenType.LPAREN)
+                    if (i + 1 >= chain.Tokens.Count || chain.Tokens[i + 1].Type != TokenType.PAREN_OPEN)
                     {
                         result.Errors.Add($"'{token.Value}' at position {i} missing condition in parentheses");
                         result.IsValid = false;
@@ -223,7 +223,7 @@ namespace DigitalBiochemicalSimulator.Grammar
                 }
 
                 var nextToken = tokens[index + 1];
-                if (nextToken.Type != TokenType.IDENTIFIER && nextToken.Type != TokenType.LPAREN)
+                if (nextToken.Type != TokenType.IDENTIFIER && nextToken.Type != TokenType.PAREN_OPEN)
                 {
                     result.Warnings.Add($"Type keyword '{token.Value}' at position {index} has unusual usage");
                 }
@@ -269,10 +269,10 @@ namespace DigitalBiochemicalSimulator.Grammar
         {
             return type switch
             {
-                TokenType.KEYWORD_INT => "int",
-                TokenType.KEYWORD_FLOAT => "float",
-                TokenType.KEYWORD_BOOL => "bool",
-                TokenType.KEYWORD_STRING => "string",
+                TokenType.TYPE_INT => "int",
+                TokenType.TYPE_FLOAT => "float",
+                TokenType.TYPE_BOOL => "bool",
+                TokenType.TYPE_STRING => "string",
                 _ => "unknown"
             };
         }
@@ -374,10 +374,10 @@ namespace DigitalBiochemicalSimulator.Grammar
         /// </summary>
         private bool IsTypeKeyword(Token token)
         {
-            return token.Type == TokenType.KEYWORD_INT ||
-                   token.Type == TokenType.KEYWORD_FLOAT ||
-                   token.Type == TokenType.KEYWORD_BOOL ||
-                   token.Type == TokenType.KEYWORD_STRING;
+            return token.Type == TokenType.TYPE_INT ||
+                   token.Type == TokenType.TYPE_FLOAT ||
+                   token.Type == TokenType.TYPE_BOOL ||
+                   token.Type == TokenType.TYPE_STRING;
         }
 
         /// <summary>

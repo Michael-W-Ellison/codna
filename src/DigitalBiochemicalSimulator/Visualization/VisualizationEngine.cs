@@ -5,6 +5,8 @@ using Spectre.Console;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
+using Spectre.Console.Rendering;
+using Grid = DigitalBiochemicalSimulator.DataStructures.Grid;
 
 namespace DigitalBiochemicalSimulator.Visualization
 {
@@ -125,7 +127,7 @@ namespace DigitalBiochemicalSimulator.Visualization
 
             return new Panel(canvas)
                 .Header($"[bold]Grid Layer Z={_currentLayer}[/]")
-                .BorderColor(Color.Cyan)
+                .BorderColor(Color.Aqua)
                 .Expand();
         }
 
@@ -193,8 +195,8 @@ namespace DigitalBiochemicalSimulator.Visualization
                 (TokenType.IDENTIFIER, "Identifier", Color.Green),
                 (TokenType.OPERATOR_PLUS, "Operator +", Color.Red),
                 (TokenType.OPERATOR_MINUS, "Operator -", Color.Red),
-                (TokenType.OPERATOR_MULTIPLY, "Operator *", Color.Magenta),
-                (TokenType.OPERATOR_DIVIDE, "Operator /", Color.Magenta)
+                (TokenType.OPERATOR_MULTIPLY, "Operator *", Color.Fuchsia),
+                (TokenType.OPERATOR_DIVIDE, "Operator /", Color.Fuchsia)
             };
 
             foreach (var (type, name, color) in tokenTypes)
@@ -239,13 +241,13 @@ namespace DigitalBiochemicalSimulator.Visualization
                 TokenType.IDENTIFIER => Color.Green,
                 TokenType.OPERATOR_PLUS => Color.Red,
                 TokenType.OPERATOR_MINUS => Color.Red,
-                TokenType.OPERATOR_MULTIPLY => Color.Magenta,
-                TokenType.OPERATOR_DIVIDE => Color.Magenta,
-                TokenType.OPERATOR_MODULO => Color.Magenta,
-                TokenType.OPERATOR_EQUALS => Color.Cyan,
-                TokenType.OPERATOR_NOT_EQUALS => Color.Cyan,
-                TokenType.OPERATOR_LESS_THAN => Color.Cyan,
-                TokenType.OPERATOR_GREATER_THAN => Color.Cyan,
+                TokenType.OPERATOR_MULTIPLY => Color.Fuchsia,
+                TokenType.OPERATOR_DIVIDE => Color.Fuchsia,
+                TokenType.OPERATOR_MODULO => Color.Fuchsia,
+                TokenType.OPERATOR_EQUALS => Color.Aqua,
+                TokenType.OPERATOR_NOT_EQUALS => Color.Aqua,
+                TokenType.OPERATOR_LESS_THAN => Color.Aqua,
+                TokenType.OPERATOR_GREATER_THAN => Color.Aqua,
                 TokenType.KEYWORD_IF => Color.Orange1,
                 TokenType.KEYWORD_ELSE => Color.Orange1,
                 TokenType.KEYWORD_WHILE => Color.Orange1,
@@ -255,14 +257,14 @@ namespace DigitalBiochemicalSimulator.Visualization
                 TokenType.KEYWORD_VAR => Color.Teal,
                 TokenType.KEYWORD_LET => Color.Teal,
                 TokenType.KEYWORD_CONST => Color.Teal,
-                TokenType.DELIMITER_SEMICOLON => Color.Grey,
-                TokenType.DELIMITER_COMMA => Color.Grey,
-                TokenType.BRACKET_OPEN_PAREN => Color.White,
-                TokenType.BRACKET_CLOSE_PAREN => Color.White,
-                TokenType.BRACKET_OPEN_BRACE => Color.White,
-                TokenType.BRACKET_CLOSE_BRACE => Color.White,
-                TokenType.BRACKET_OPEN_BRACKET => Color.White,
-                TokenType.BRACKET_CLOSE_BRACKET => Color.White,
+                TokenType.SEMICOLON => Color.Grey,
+                TokenType.COMMA => Color.Grey,
+                TokenType.PAREN_OPEN => Color.White,
+                TokenType.PAREN_CLOSE => Color.White,
+                TokenType.BRACE_OPEN => Color.White,
+                TokenType.BRACE_CLOSE => Color.White,
+                TokenType.BRACKET_OPEN => Color.White,
+                TokenType.BRACKET_CLOSE => Color.White,
                 _ => Color.Grey
             };
         }

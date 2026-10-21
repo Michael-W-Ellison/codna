@@ -275,8 +275,8 @@ namespace DigitalBiochemicalSimulator.Damage
                 { TokenType.FLOAT_LITERAL, new[] { TokenType.INTEGER_LITERAL, TokenType.STRING_LITERAL } },
                 { TokenType.STRING_LITERAL, new[] { TokenType.INTEGER_LITERAL, TokenType.FLOAT_LITERAL } },
 
-                { TokenType.TYPE_INT, new[] { TokenType.TYPE_FLOAT, TokenType.TYPE_LONG } },
-                { TokenType.TYPE_FLOAT, new[] { TokenType.TYPE_INT, TokenType.TYPE_DOUBLE } },
+                { TokenType.TYPE_INT, new[] { TokenType.TYPE_FLOAT } },
+                { TokenType.TYPE_FLOAT, new[] { TokenType.TYPE_INT } },
 
                 { TokenType.OPERATOR_PLUS, new[] { TokenType.OPERATOR_MINUS, TokenType.OPERATOR_MULTIPLY } },
                 { TokenType.OPERATOR_MINUS, new[] { TokenType.OPERATOR_PLUS, TokenType.OPERATOR_DIVIDE } },

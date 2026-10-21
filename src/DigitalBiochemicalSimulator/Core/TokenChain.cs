@@ -449,7 +449,7 @@ namespace DigitalBiochemicalSimulator.Core
                 if (expectOperand && !isOperand)
                 {
                     // Allow parentheses and keywords
-                    if (token.Type != TokenType.LPAREN &&
+                    if (token.Type != TokenType.PAREN_OPEN &&
                         token.Type != TokenType.KEYWORD_IF &&
                         token.Type != TokenType.KEYWORD_WHILE)
                     {
@@ -459,7 +459,7 @@ namespace DigitalBiochemicalSimulator.Core
                 else if (!expectOperand && !isOperator)
                 {
                     // Allow closing parentheses and semicolons
-                    if (token.Type != TokenType.RPAREN &&
+                    if (token.Type != TokenType.PAREN_CLOSE &&
                         token.Type != TokenType.SEMICOLON)
                     {
                         return false;

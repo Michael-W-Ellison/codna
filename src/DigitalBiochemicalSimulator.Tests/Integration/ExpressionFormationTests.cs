@@ -99,7 +99,7 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
         }
 
         [Fact]
-        public void ChainStability_IncreasesWith ValidGrammar()
+        public void ChainStability_IncreasesWithValidGrammar()
         {
             // Arrange
             var config = SimulationConfig.CreateMinimal();

@@ -18,6 +18,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public int Width => Dimensions.X;
         public int Height => Dimensions.Y;
         public int Depth => Dimensions.Z;
+        public int CellCapacity { get; private set; }
 
         private Cell[,,] _cells;
         private readonly ConcurrentDictionary<Vector3Int, byte> _activeCells;
@@ -26,6 +27,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public Grid(int width, int height, int depth, int cellCapacity = 1000)
         {
             Dimensions = new Vector3Int(width, height, depth);
+            CellCapacity = cellCapacity;
             _cells = new Cell[width, height, depth];
             _activeCells = new ConcurrentDictionary<Vector3Int, byte>();
             _cellLock = new ReaderWriterLockSlim();

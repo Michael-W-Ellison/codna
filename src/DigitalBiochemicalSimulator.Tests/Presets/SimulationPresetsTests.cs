@@ -1,6 +1,7 @@
 using Xunit;
 using DigitalBiochemicalSimulator.Presets;
 using DigitalBiochemicalSimulator.Simulation;
+using SimulationPresets = DigitalBiochemicalSimulator.Presets.SimulationPresets;
 
 namespace DigitalBiochemicalSimulator.Tests.Presets
 {

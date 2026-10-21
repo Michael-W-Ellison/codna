@@ -648,14 +648,18 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 foreach (var tokenState in state.Tokens)
                 {
+                    if (!Enum.TryParse<TokenType>(tokenState.Type, out var tokenType))
+                        continue;
+
                     var token = simulation.TokenFactory.CreateToken(
-                        tokenState.Type,
-                        tokenState.Value,
+                        tokenType,
                         new Vector3Int(tokenState.Position.X, tokenState.Position.Y, tokenState.Position.Z)
                     );
 
                     if (token != null)
                     {
+                        token.Value = tokenState.Value;
+                        token.Mass = tokenState.Mass;
                         token.Energy = tokenState.Energy;
                         token.Velocity = new Vector3Int(tokenState.Velocity.X, tokenState.Velocity.Y, tokenState.Velocity.Z);
                         token.IsActive = tokenState.IsActive;

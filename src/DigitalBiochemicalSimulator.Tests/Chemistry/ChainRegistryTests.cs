@@ -55,7 +55,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             registry.RegisterChain(chain);
 
             // Act
-            registry.UnregisterChain(chain.Id);
+            registry.RemoveChain(chain.Id);
 
             // Assert
             var retrievedChain = registry.GetChain(chain.Id);
@@ -207,7 +207,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             Assert.NotNull(stats);
             Assert.Equal(2, stats.TotalChains);
             Assert.Equal(8, stats.TotalTokensInChains); // 3 + 5
-            Assert.Equal(4.0, stats.AverageChainLength); // (3 + 5) / 2
+            Assert.Equal(4.0, stats.AverageLength); // (3 + 5) / 2
             Assert.Equal(5, stats.LongestChainLength);
         }
 

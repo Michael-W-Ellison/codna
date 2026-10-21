@@ -120,7 +120,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (site1 != null)
             {
                 site1.IsOccupied = true;
-                site1.BondedTokenId = token2.Id;
+                site1.BondedTo = token2;
             }
 
             // Find an available bond site on token2
@@ -128,7 +128,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (site2 != null)
             {
                 site2.IsOccupied = true;
-                site2.BondedTokenId = token1.Id;
+                site2.BondedTo = token1;
             }
         }
 
@@ -342,32 +342,37 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Breaks a bond between two tokens
         /// </summary>
-        public void BreakBond(Token token1, Token token2, long currentTick)
+        /// <returns>True if the tokens were bonded and the bond was broken</returns>
+        public bool BreakBond(Token token1, Token token2, long currentTick)
         {
             if (token1 == null || token2 == null)
-                return;
+                return false;
+
+            if (!token1.BondedTokens.Contains(token2) && !token2.BondedTokens.Contains(token1))
+                return false;
 
             // Remove bond references
             token1.BondedTokens.Remove(token2);
             token2.BondedTokens.Remove(token1);
 
             // Free bond sites
-            var site1 = token1.BondSites.FirstOrDefault(s => s.BondedTokenId == token2.Id);
+            var site1 = token1.BondSites.FirstOrDefault(s => s.BondedTo == token2);
             if (site1 != null)
             {
                 site1.IsOccupied = false;
-                site1.BondedTokenId = 0;
+                site1.BondedTo = null;
             }
 
-            var site2 = token2.BondSites.FirstOrDefault(s => s.BondedTokenId == token1.Id);
+            var site2 = token2.BondSites.FirstOrDefault(s => s.BondedTo == token1);
             if (site2 != null)
             {
                 site2.IsOccupied = false;
-                site2.BondedTokenId = 0;
+                site2.BondedTo = null;
             }
 
             // Update chains (may split)
             UpdateChainsAfterBreak(token1, token2, currentTick);
+            return true;
         }
 
         /// <summary>
@@ -527,6 +532,14 @@ namespace DigitalBiochemicalSimulator.Chemistry
             }
 
             return tail;
+        }
+
+        /// <summary>
+        /// Gets the chain containing a specific token, or null if it is not in a chain
+        /// </summary>
+        public TokenChain GetTokenChain(Token token)
+        {
+            return FindChainContaining(token);
         }
 
         /// <summary>

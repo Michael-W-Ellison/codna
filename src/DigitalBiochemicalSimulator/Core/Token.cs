@@ -26,6 +26,7 @@ namespace DigitalBiochemicalSimulator.Core
         public List<BondSite> BondSites { get; set; }
         public List<Token> BondedTokens { get; set; }
         public Token? ChainHead { get; set; }
+        public long ChainId { get; set; } // 0 when not in a chain
         public int ChainPosition { get; set; }
 
         // Metadata (subject to damage)
@@ -58,6 +59,7 @@ namespace DigitalBiochemicalSimulator.Core
             BondSites = new List<BondSite>();
             BondedTokens = new List<Token>();
             ChainHead = null;
+            ChainId = 0;
             ChainPosition = 0;
 
             Metadata = new TokenMetadata();

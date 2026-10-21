@@ -3,6 +3,9 @@ using Xunit.Abstractions;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
+using DigitalBiochemicalSimulator.Chemistry;
+using DigitalBiochemicalSimulator.Utilities;
+using DigitalBiochemicalSimulator.Grammar;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -28,7 +31,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
         {
             // Arrange & Act
             var stopwatch = Stopwatch.StartNew();
-            var grid = new Grid(100, 100, 100, capacity: 5);
+            var grid = new Grid(100, 100, 100, cellCapacity: 5);
             stopwatch.Stop();
 
             // Assert
@@ -180,7 +183,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
         public void Stress_DenseTokenClustering_HandlesEfficiently()
         {
             // Arrange - All tokens in same cell
-            var grid = new Grid(10, 10, 10, capacity: 1000);
+            var grid = new Grid(10, 10, 10, cellCapacity: 1000);
             var tokens = new List<Token>();
 
             for (int i = 0; i < 500; i++)
@@ -236,8 +239,8 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
             grid.AddToken(token1);
             grid.AddToken(token2);
 
-            var rulesEngine = new BondRulesEngine();
-            var strengthCalculator = new BondStrengthCalculator();
+            var rulesEngine = new BondRulesEngine(GrammarLibrary.GetDefaultGrammar());
+            var strengthCalculator = new BondStrengthCalculator(rulesEngine);
             var bondingManager = new BondingManager(rulesEngine, strengthCalculator, config, grid);
 
             // Act - Rapidly bond and unbond

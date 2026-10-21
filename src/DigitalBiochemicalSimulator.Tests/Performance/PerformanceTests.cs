@@ -3,6 +3,9 @@ using Xunit.Abstractions;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
+using DigitalBiochemicalSimulator.Chemistry;
+using DigitalBiochemicalSimulator.Utilities;
+using DigitalBiochemicalSimulator.Grammar;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -98,7 +101,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
         {
             // Arrange - 100x100x100 grid (1 million cells)
             var stopwatch = Stopwatch.StartNew();
-            var grid = new Grid(100, 100, 100, capacity: 10);
+            var grid = new Grid(100, 100, 100, cellCapacity: 10);
             stopwatch.Stop();
 
             var creationTime = stopwatch.ElapsedMilliseconds;
@@ -222,8 +225,8 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
                 grid.AddToken(token);
             }
 
-            var rulesEngine = new BondRulesEngine();
-            var strengthCalculator = new BondStrengthCalculator();
+            var rulesEngine = new BondRulesEngine(GrammarLibrary.GetDefaultGrammar());
+            var strengthCalculator = new BondStrengthCalculator(rulesEngine);
             var bondingManager = new BondingManager(rulesEngine, strengthCalculator, config, grid);
 
             // Act - Attempt bonding

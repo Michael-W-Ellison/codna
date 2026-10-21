@@ -80,9 +80,10 @@ namespace DigitalBiochemicalSimulator.Tests.Physics
                 TotalEnergy = 30
             };
             int energyPerBond = 5;
+            config.EnergyPerBond = energyPerBond;
 
             // Act
-            energyManager.DistributeChainEnergy(chain, energyPerBond);
+            energyManager.DistributeChainEnergy(chain);
 
             // Assert
             // Energy should increase by (length-1) * energyPerBond = 2 * 5 = 10

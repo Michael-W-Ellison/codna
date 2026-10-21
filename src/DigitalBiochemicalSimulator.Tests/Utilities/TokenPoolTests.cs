@@ -295,7 +295,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             token.BondedTokens.Add(otherToken);
             if (token.BondSites.Count > 0)
             {
-                token.BondSites[0].BondTo(otherToken, 0);
+                token.BondSites[0].FormBond(otherToken, 0);
             }
 
             // Act
@@ -305,7 +305,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             Assert.Empty(token.BondedTokens);
             foreach (var site in token.BondSites)
             {
-                Assert.False(site.IsBonded);
+                Assert.False(site.IsOccupied);
             }
         }
 

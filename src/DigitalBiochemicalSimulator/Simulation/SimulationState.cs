@@ -109,6 +109,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int Energy { get; set; }
         public int Mass { get; set; }
         public bool IsActive { get; set; }
+        public bool IsDamaged { get; set; }
         public float DamageLevel { get; set; }
         public List<long> BondedTokenIds { get; set; }
         public TokenMetadataState Metadata { get; set; }
@@ -132,6 +133,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 Energy = token.Energy,
                 Mass = token.Mass,
                 IsActive = token.IsActive,
+                IsDamaged = token.IsDamaged,
                 DamageLevel = token.DamageLevel,
                 BondedTokenIds = token.BondedTokens.Select(t => t.Id).ToList(),
                 Metadata = token.Metadata != null ? TokenMetadataState.FromMetadata(token.Metadata) : null,
@@ -156,11 +158,11 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             return new TokenMetadataState
             {
-                Category = metadata.Category,
-                Subtype = metadata.Subtype,
-                Role = metadata.Role,
+                Category = metadata.SyntaxCategory,
+                Subtype = metadata.SemanticType,
+                Role = metadata.GrammarRole,
                 Electronegativity = metadata.Electronegativity,
-                BondCapacity = metadata.BondCapacity
+                BondCapacity = metadata.BondingCapacity
             };
         }
     }
@@ -279,7 +281,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 StableChains = snapshot.StableChains,
                 ValidChains = snapshot.ValidChains,
                 AverageEnergy = (float)snapshot.AverageEnergy,
-                AverageStability = snapshot.AverageChainStability,
+                AverageStability = (float)snapshot.AverageChainStability,
                 TicksPerSecond = snapshot.TicksPerSecond
             };
         }
@@ -337,6 +339,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             };
 
             // Only save occupied cells to reduce file size
+            var activeCells = grid.ActiveCells;
             var occupiedCells = new List<CellState>();
             for (int x = 0; x < grid.Width; x++)
             {
@@ -351,7 +354,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                             {
                                 Position = new Vector3IntState { X = x, Y = y, Z = z },
                                 TokenIds = cell.Tokens.Select(t => t.Id).ToList(),
-                                IsActive = cell.IsActive
+                                IsActive = activeCells.Contains(new Vector3Int(x, y, z))
                             });
                         }
                     }

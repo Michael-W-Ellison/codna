@@ -58,6 +58,22 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int TickDuration { get; set; } = 100;  // milliseconds
         public int TicksPerSecond { get; set; } = 10;
 
+        /// <summary>
+        /// Alias for MaxActiveTokens
+        /// </summary>
+        public int MaxTokens
+        {
+            get => MaxActiveTokens;
+            set => MaxActiveTokens = value;
+        }
+
+        // Preset tuning values (stored and saved with the configuration;
+        // not read by the physics, bonding, or damage systems)
+        public int TokenGenerationRate { get; set; } = 1;
+        public float GravityStrength { get; set; } = 1.0f;
+        public float BondingRange { get; set; } = 0.0f;
+        public float DamageMultiplier { get; set; } = 1.0f;
+
         // Token Distribution (probabilities for each token category)
         public TokenDistributionProfile TokenDistribution { get; set; } =
             TokenDistributionProfile.Balanced;
@@ -72,6 +88,26 @@ namespace DigitalBiochemicalSimulator.Simulation
         public SimulationConfig()
         {
         }
+
+        /// <summary>
+        /// Creates a configuration with the given grid dimensions and default values
+        /// </summary>
+        public SimulationConfig(int gridWidth, int gridHeight, int gridDepth)
+        {
+            GridWidth = gridWidth;
+            GridHeight = gridHeight;
+            GridDepth = gridDepth;
+        }
+
+        /// <summary>
+        /// Creates a configuration from the Standard preset
+        /// </summary>
+        public static SimulationConfig CreateStandard() => SimulationPresets.Standard;
+
+        /// <summary>
+        /// Creates a configuration from the Minimal preset
+        /// </summary>
+        public static SimulationConfig CreateMinimal() => SimulationPresets.Minimal;
 
         /// <summary>
         /// Creates a copy of this configuration

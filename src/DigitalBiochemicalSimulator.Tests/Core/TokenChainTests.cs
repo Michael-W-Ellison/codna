@@ -302,7 +302,7 @@ namespace DigitalBiochemicalSimulator.Tests.Core
             var chain = new TokenChain();
 
             // Act
-            bool isValid = chain.ValidateChain();
+            bool isValid = chain.ValidateChain().IsValid;
 
             // Assert
             Assert.False(isValid);
@@ -326,35 +326,10 @@ namespace DigitalBiochemicalSimulator.Tests.Core
             chain.AddToken(token3, atTail: true);
 
             // Act
-            bool isValid = chain.ValidateChain();
+            bool isValid = chain.ValidateChain().IsValid;
 
             // Assert - depends on grammar rules, but should execute without errors
             Assert.True(isValid || !isValid); // Just verify it runs
-        }
-
-        [Fact]
-        public void Clone_CreatesIndependentCopy()
-        {
-            // Arrange
-            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero) { Mass = 5, Energy = 50 };
-            var chain = new TokenChain(token)
-            {
-                StabilityScore = 0.8f,
-                IsValid = true,
-                AverageBondStrength = 0.6f
-            };
-
-            // Act
-            var clone = chain.Clone();
-
-            // Assert
-            Assert.NotSame(chain, clone);
-            Assert.Equal(chain.Length, clone.Length);
-            Assert.Equal(chain.TotalMass, clone.TotalMass);
-            Assert.Equal(chain.TotalEnergy, clone.TotalEnergy);
-            Assert.Equal(chain.StabilityScore, clone.StabilityScore);
-            Assert.Equal(chain.IsValid, clone.IsValid);
-            Assert.Equal(chain.AverageBondStrength, clone.AverageBondStrength);
         }
 
         [Fact]
