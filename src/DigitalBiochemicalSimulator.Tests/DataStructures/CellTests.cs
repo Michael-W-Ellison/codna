@@ -62,7 +62,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
             var cell = new Cell(Vector3Int.Zero);
 
             // Act
-            bool result = cell.AddToken(null);
+            bool result = cell.AddToken(null!);
 
             // Assert
             Assert.False(result);
@@ -131,7 +131,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
             cell.AddToken(token);
 
             // Act
-            bool result = cell.RemoveToken(null);
+            bool result = cell.RemoveToken(null!);
 
             // Assert
             Assert.False(result);

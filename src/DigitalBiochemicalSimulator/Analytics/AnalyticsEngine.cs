@@ -77,7 +77,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         /// <summary>
         /// Records a simulation event
         /// </summary>
-        public void RecordEvent(string eventType, string description, long tick, Dictionary<string, object> data = null)
+        public void RecordEvent(string eventType, string description, long tick, Dictionary<string, object>? data = null)
         {
             lock (_analyticsLock)
             {
@@ -153,8 +153,8 @@ namespace DigitalBiochemicalSimulator.Analytics
                 TopLineages = topLineages,
                 CommonPatterns = patterns.Select(p => new
                 {
-                    Hash = p.Pattern.Hash,
-                    Length = p.Pattern.Length,
+                    Hash = p.Pattern?.Hash,
+                    Length = p.Pattern?.Length ?? 0,
                     Count = p.Count,
                     AverageFitness = p.AverageFitness
                 })
@@ -209,7 +209,7 @@ namespace DigitalBiochemicalSimulator.Analytics
                 ActiveLineages = evolutionStats.ActiveLineages,
                 UniquePatterns = evolutionStats.UniquePatterns,
                 TotalEvents = _events.Count,
-                MostCommonPattern = patterns.FirstOrDefault()?.Pattern.Hash ?? "None",
+                MostCommonPattern = patterns.FirstOrDefault()?.Pattern?.Hash ?? "None",
                 HighestFitness = patterns.Any() ? patterns.Max(p => p.AverageFitness) : 0
             };
         }
@@ -277,7 +277,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         /// <summary>
         /// Gets statistics for a specific metric
         /// </summary>
-        public MetricStatistics GetMetricStatistics(string metricName)
+        public MetricStatistics? GetMetricStatistics(string metricName)
         {
             return _timeSeriesTracker.GetStatistics(metricName);
         }
@@ -301,11 +301,11 @@ namespace DigitalBiochemicalSimulator.Analytics
     /// </summary>
     public class SimulationEvent
     {
-        public string Type { get; set; }
-        public string Description { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
         public long Tick { get; set; }
         public DateTime Timestamp { get; set; }
-        public Dictionary<string, object> Data { get; set; }
+        public Dictionary<string, object> Data { get; set; } = new();
     }
 
     /// <summary>
@@ -319,7 +319,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         public int ActiveLineages { get; set; }
         public int UniquePatterns { get; set; }
         public int TotalEvents { get; set; }
-        public string MostCommonPattern { get; set; }
+        public string MostCommonPattern { get; set; } = string.Empty;
         public double HighestFitness { get; set; }
     }
 
@@ -334,9 +334,9 @@ namespace DigitalBiochemicalSimulator.Analytics
         public int StableChains { get; set; }
         public double AverageEnergy { get; set; }
         public double TPS { get; set; }
-        public EvolutionStatistics EvolutionStats { get; set; }
-        public List<SimulationEvent> RecentEvents { get; set; }
-        public Dictionary<string, TrendData> Trends { get; set; }
+        public EvolutionStatistics? EvolutionStats { get; set; }
+        public List<SimulationEvent> RecentEvents { get; set; } = new();
+        public Dictionary<string, TrendData> Trends { get; set; } = new();
     }
 
     /// <summary>
@@ -344,7 +344,7 @@ namespace DigitalBiochemicalSimulator.Analytics
     /// </summary>
     public class TrendData
     {
-        public string Direction { get; set; }
+        public string Direction { get; set; } = string.Empty;
         public double Slope { get; set; }
         public double ChangeRate { get; set; }
     }

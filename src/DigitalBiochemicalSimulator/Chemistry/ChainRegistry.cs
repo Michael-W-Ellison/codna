@@ -50,7 +50,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Gets a chain by ID (thread-safe)
         /// </summary>
-        public TokenChain GetChain(long id)
+        public TokenChain? GetChain(long id)
         {
             return _chains.TryGetValue(id, out var chain) ? chain : null;
         }
@@ -178,7 +178,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the longest chain
         /// </summary>
-        public TokenChain GetLongestChain()
+        public TokenChain? GetLongestChain()
         {
             return _chains.Values
                 .OrderByDescending(c => c.Length)
@@ -188,7 +188,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the most stable chain
         /// </summary>
-        public TokenChain GetMostStableChain()
+        public TokenChain? GetMostStableChain()
         {
             return _chains.Values
                 .OrderByDescending(c => c.StabilityScore)

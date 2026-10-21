@@ -13,11 +13,11 @@ namespace DigitalBiochemicalSimulator.Simulation
     public class SimulationState
     {
         public StateMetadata Metadata { get; set; }
-        public SimulationConfigState Configuration { get; set; }
+        public SimulationConfigState? Configuration { get; set; }
         public List<TokenState> Tokens { get; set; }
         public List<ChainState> Chains { get; set; }
-        public GridState Grid { get; set; }
-        public StatisticsState Statistics { get; set; }
+        public GridState? Grid { get; set; }
+        public StatisticsState? Statistics { get; set; }
 
         public SimulationState()
         {
@@ -51,7 +51,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public string Version { get; set; } = "1.0";
         public DateTime SavedAt { get; set; } = DateTime.Now;
         public long CurrentTick { get; set; }
-        public string Description { get; set; }
+        public string? Description { get; set; }
         public Dictionary<string, string> CustomData { get; set; }
 
         public StateMetadata()
@@ -102,17 +102,17 @@ namespace DigitalBiochemicalSimulator.Simulation
     public class TokenState
     {
         public long Id { get; set; }
-        public string Type { get; set; }
-        public string Value { get; set; }
-        public Vector3IntState Position { get; set; }
-        public Vector3IntState Velocity { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public Vector3IntState Position { get; set; } = new Vector3IntState();
+        public Vector3IntState Velocity { get; set; } = new Vector3IntState();
         public int Energy { get; set; }
         public int Mass { get; set; }
         public bool IsActive { get; set; }
         public bool IsDamaged { get; set; }
         public float DamageLevel { get; set; }
         public List<long> BondedTokenIds { get; set; }
-        public TokenMetadataState Metadata { get; set; }
+        public TokenMetadataState? Metadata { get; set; }
         public long ChainId { get; set; }
         public int ChainPosition { get; set; }
 
@@ -148,9 +148,9 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// </summary>
     public class TokenMetadataState
     {
-        public string Category { get; set; }
-        public string Subtype { get; set; }
-        public string Role { get; set; }
+        public string Category { get; set; } = string.Empty;
+        public string Subtype { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
         public float Electronegativity { get; set; }
         public int BondCapacity { get; set; }
 
@@ -195,7 +195,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public float StabilityScore { get; set; }
         public float AverageBondStrength { get; set; }
         public bool IsValid { get; set; }
-        public string BondType { get; set; }
+        public string BondType { get; set; } = string.Empty;
         public long CreatedAt { get; set; }
         public long LastModifiedAt { get; set; }
 
@@ -245,7 +245,7 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// </summary>
     public class CellState
     {
-        public Vector3IntState Position { get; set; }
+        public Vector3IntState Position { get; set; } = new Vector3IntState();
         public List<long> TokenIds { get; set; }
         public bool IsActive { get; set; }
 

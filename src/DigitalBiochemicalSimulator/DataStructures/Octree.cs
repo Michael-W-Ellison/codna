@@ -129,7 +129,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// <summary>
         /// Finds the nearest token to a position
         /// </summary>
-        public Token FindNearest(Vector3Int position)
+        public Token? FindNearest(Vector3Int position)
         {
             var neighbors = FindNearestNeighbors(position, 1);
             return neighbors.FirstOrDefault();
@@ -183,10 +183,11 @@ namespace DigitalBiochemicalSimulator.DataStructures
     {
         private BoundingBox _bounds;
         private List<Token> _tokens;
-        private OctreeNode[] _children;
+        private OctreeNode[]? _children;
         private int _depth;
         private int _maxTokensPerNode;
 
+        [System.Diagnostics.CodeAnalysis.MemberNotNullWhen(false, nameof(_children))]
         public bool IsLeaf => _children == null;
         public int TokenCount => _tokens?.Count ?? 0;
 
@@ -366,6 +367,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(_children))]
         private void Subdivide()
         {
             var center = _bounds.Center;
@@ -381,6 +383,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
 
         private void RedistributeTokens()
         {
+            if (_children == null)
+                return;
+
             var tokensToRedistribute = new List<Token>(_tokens);
             _tokens.Clear();
 
@@ -504,7 +509,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
     /// </summary>
     internal class TokenDistance
     {
-        public Token Token { get; set; }
+        public required Token Token { get; set; }
         public float Distance { get; set; }
     }
 

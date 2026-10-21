@@ -98,7 +98,7 @@ src/DigitalBiochemicalSimulator/
 
 ## Key Design Decisions
 
-### 1. C# + .NET 6.0
+### 1. C# + .NET 10.0
 - **Rationale**: Cross-platform compatibility, strong typing, excellent performance
 - **Future**: Can integrate with Unity for visualization or stay standalone
 
@@ -139,7 +139,7 @@ src/DigitalBiochemicalSimulator/
 ## Technology Stack
 
 - **Language**: C# 10
-- **Framework**: .NET 6.0
+- **Framework**: .NET 10.0
 - **Serialization**: Newtonsoft.Json
 - **Future Visualization**: Unity or MonoGame
 - **Target Platform**: Windows (with Linux/Mac support)

@@ -102,7 +102,7 @@ namespace DigitalBiochemicalSimulator.Tests.Core
             var chain = new TokenChain(token1);
 
             // Act
-            bool result = chain.AddToken(null, atTail: true);
+            bool result = chain.AddToken(null!, atTail: true);
 
             // Assert
             Assert.False(result);

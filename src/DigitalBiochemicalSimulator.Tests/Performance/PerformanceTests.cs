@@ -518,6 +518,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
             Assert.True(saveStopwatch.ElapsedMilliseconds < 1000, "Save too slow");
             Assert.True(loadStopwatch.ElapsedMilliseconds < 1000, "Load too slow");
             Assert.True(loadResult.Success, "Load failed");
+            Assert.NotNull(loadResult.State);
             Assert.Equal(500, loadResult.State.Tokens.Count);
 
             // Cleanup

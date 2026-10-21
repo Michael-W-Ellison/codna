@@ -75,12 +75,12 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the best matching grammar rule for a token sequence
         /// </summary>
-        public GrammarRule FindBestMatch(List<Token> tokens)
+        public GrammarRule? FindBestMatch(List<Token> tokens)
         {
             if (tokens == null || tokens.Count == 0)
                 return null;
 
-            GrammarRule bestMatch = null;
+            GrammarRule? bestMatch = null;
             int maxMatchLength = 0;
 
             foreach (var rule in _grammarRules)
@@ -189,7 +189,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Gets a grammar rule by ID
         /// </summary>
-        public GrammarRule GetRuleById(string id)
+        public GrammarRule? GetRuleById(string id)
         {
             return _ruleIndex.TryGetValue(id, out var rule) ? rule : null;
         }

@@ -43,13 +43,13 @@ Console.WriteLine($"Chains formed: {stats.TotalChains}");
 
 ### Minimum Requirements
 - **OS:** Windows 10 or later
-- **.NET:** .NET 6.0 SDK or later
+- **.NET:** .NET 10.0 SDK or later
 - **RAM:** 4 GB
 - **Storage:** 100 MB
 
 ### Recommended Requirements
 - **OS:** Windows 11
-- **.NET:** .NET 6.0 or later
+- **.NET:** .NET 10.0 or later
 - **RAM:** 8 GB or more
 - **Storage:** 500 MB
 - **CPU:** Multi-core processor for better performance

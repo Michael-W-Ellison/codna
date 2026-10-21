@@ -250,6 +250,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
 
             // Assert
             var retrieved = registry.GetChain(1);
+            Assert.NotNull(retrieved);
             Assert.Equal(2, retrieved.Length); // Second chain replaced first
         }
     }

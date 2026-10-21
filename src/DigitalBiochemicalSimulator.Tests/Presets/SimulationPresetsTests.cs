@@ -153,7 +153,7 @@ namespace DigitalBiochemicalSimulator.Tests.Presets
             // Assert
             foreach (var preset in allPresets.Values)
             {
-                Assert.True(preset.Validate(out string errorMessage),
+                Assert.True(preset.Validate(out string? errorMessage),
                     $"Preset configuration is invalid: {errorMessage}");
             }
         }

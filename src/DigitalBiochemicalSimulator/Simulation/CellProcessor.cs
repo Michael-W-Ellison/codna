@@ -119,7 +119,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (grid == null || grid.ActiveCells == null)
                 return new List<CellProcessingResult>();
 
-            var activeCells = grid.ActiveCells.Select(pos => grid.GetCell(pos)).Where(c => c != null).ToList();
+            var activeCells = grid.ActiveCells.Select(pos => grid.GetCell(pos)).OfType<Cell>().ToList();
             return ProcessCells(activeCells, currentTick);
         }
     }

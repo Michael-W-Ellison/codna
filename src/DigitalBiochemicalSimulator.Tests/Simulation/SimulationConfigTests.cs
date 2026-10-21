@@ -51,7 +51,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             var config = new SimulationConfig(50, 50, 50);
 
             // Act
-            bool isValid = config.Validate(out string errorMessage);
+            bool isValid = config.Validate(out string? errorMessage);
 
             // Assert
             Assert.True(isValid);
@@ -65,10 +65,11 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             var config = new SimulationConfig(0, 50, 50);
 
             // Act
-            bool isValid = config.Validate(out string errorMessage);
+            bool isValid = config.Validate(out string? errorMessage);
 
             // Assert
             Assert.False(isValid);
+            Assert.NotNull(errorMessage);
             Assert.NotEmpty(errorMessage);
             Assert.Contains("width", errorMessage.ToLower());
         }
@@ -83,10 +84,11 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             };
 
             // Act
-            bool isValid = config.Validate(out string errorMessage);
+            bool isValid = config.Validate(out string? errorMessage);
 
             // Assert
             Assert.False(isValid);
+            Assert.NotNull(errorMessage);
             Assert.NotEmpty(errorMessage);
         }
 
@@ -97,10 +99,11 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             var config = new SimulationConfig(10000, 10000, 10000);
 
             // Act
-            bool isValid = config.Validate(out string errorMessage);
+            bool isValid = config.Validate(out string? errorMessage);
 
             // Assert
             Assert.False(isValid);
+            Assert.NotNull(errorMessage);
             Assert.NotEmpty(errorMessage);
             Assert.Contains("large", errorMessage.ToLower());
         }

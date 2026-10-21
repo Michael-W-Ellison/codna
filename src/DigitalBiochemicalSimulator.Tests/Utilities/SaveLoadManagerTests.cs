@@ -86,6 +86,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             // Act
             manager.Save(state, "token_test");
             var loadedState = manager.Load("token_test").State;
+            Assert.NotNull(loadedState);
             var loadedToken = loadedState.Tokens[0];
 
             // Assert
@@ -112,6 +113,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             // Act
             manager.Save(state, "chain_test");
             var loadedState = manager.Load("chain_test").State;
+            Assert.NotNull(loadedState);
             var loadedChain = loadedState.Chains[0];
 
             // Assert
@@ -150,10 +152,11 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var manager = new SaveLoadManager(_testDirectory);
 
             // Act
-            var result = manager.Save(null, "null_test");
+            var result = manager.Save(null!, "null_test");
 
             // Assert
             Assert.False(result.Success);
+            Assert.NotNull(result.ErrorMessage);
             Assert.Contains("null", result.ErrorMessage.ToLower());
 
             // Cleanup
@@ -254,7 +257,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
         }
 
         [Fact]
-        public async void SaveLoadManager_SaveAsync_CreatesFile()
+        public async Task SaveLoadManager_SaveAsync_CreatesFile()
         {
             // Arrange
             var manager = new SaveLoadManager(_testDirectory);
@@ -272,7 +275,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
         }
 
         [Fact]
-        public async void SaveLoadManager_LoadAsync_ReturnsCorrectState()
+        public async Task SaveLoadManager_LoadAsync_ReturnsCorrectState()
         {
             // Arrange
             var manager = new SaveLoadManager(_testDirectory);

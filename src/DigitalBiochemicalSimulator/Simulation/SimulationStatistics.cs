@@ -172,7 +172,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Gets the most recent snapshot
         /// </summary>
-        public StatisticsSnapshot GetLatestSnapshot()
+        public StatisticsSnapshot? GetLatestSnapshot()
         {
             return _history.LastOrDefault();
         }

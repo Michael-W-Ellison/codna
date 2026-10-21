@@ -144,7 +144,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// <summary>
         /// Finds the nearest token to a position
         /// </summary>
-        public Token FindNearestToken(Vector3Int position)
+        public Token? FindNearestToken(Vector3Int position)
         {
             return _octree.FindNearest(position);
         }
@@ -312,7 +312,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public int TotalTokens { get; set; }
         public bool IsDirty { get; set; }
         public int UpdatesSinceRebuild { get; set; }
-        public OctreeStatistics OctreeStats { get; set; }
+        public OctreeStatistics? OctreeStats { get; set; }
 
         public override string ToString()
         {

@@ -11,7 +11,7 @@ namespace DigitalBiochemicalSimulator.Tests.Web
     public class SimulationWebServerTests : IDisposable
     {
         private IntegratedSimulationEngine _simulation;
-        private SimulationWebServer _server;
+        private SimulationWebServer? _server;
         private const int TestPort = 9999;
 
         public SimulationWebServerTests()
@@ -42,7 +42,7 @@ namespace DigitalBiochemicalSimulator.Tests.Web
         {
             // Arrange, Act & Assert
             Assert.Throws<ArgumentNullException>(() =>
-                new SimulationWebServer(null, TestPort));
+                new SimulationWebServer(null!, TestPort));
         }
 
         [Fact]
@@ -100,7 +100,7 @@ namespace DigitalBiochemicalSimulator.Tests.Web
         }
 
         [Fact]
-        public async void ApiStatus_ReturnsJSON()
+        public async Task ApiStatus_ReturnsJSON()
         {
             // Arrange
             _server = new SimulationWebServer(_simulation, TestPort);
@@ -129,7 +129,7 @@ namespace DigitalBiochemicalSimulator.Tests.Web
         }
 
         [Fact]
-        public async void ApiStats_ReturnsJSON()
+        public async Task ApiStats_ReturnsJSON()
         {
             // Arrange
             _server = new SimulationWebServer(_simulation, TestPort);
@@ -157,7 +157,7 @@ namespace DigitalBiochemicalSimulator.Tests.Web
         }
 
         [Fact]
-        public async void ApiInvalidEndpoint_Returns404()
+        public async Task ApiInvalidEndpoint_Returns404()
         {
             // Arrange
             _server = new SimulationWebServer(_simulation, TestPort);

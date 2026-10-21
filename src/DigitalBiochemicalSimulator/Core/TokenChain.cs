@@ -11,8 +11,8 @@ namespace DigitalBiochemicalSimulator.Core
     public class TokenChain
     {
         public long Id { get; set; }
-        public Token Head { get; set; }
-        public Token Tail { get; set; }
+        public Token? Head { get; set; }
+        public Token? Tail { get; set; }
         public int Length { get; set; }
         public int TotalMass { get; set; }
         public int TotalEnergy { get; set; }
@@ -81,10 +81,11 @@ namespace DigitalBiochemicalSimulator.Core
             // Validate bonding compatibility if adding to existing chain
             if (Length > 0)
             {
-                Token adjacentToken = atTail ? Tail : Head;
+                Token? adjacentToken = atTail ? Tail : Head;
 
                 // Check if tokens are actually bonded
-                if (!adjacentToken.BondedTokens.Contains(token) &&
+                if (adjacentToken == null ||
+                    !adjacentToken.BondedTokens.Contains(token) &&
                     !token.BondedTokens.Contains(adjacentToken))
                 {
                     return false; // Not bonded, cannot add
@@ -479,7 +480,7 @@ namespace DigitalBiochemicalSimulator.Core
         /// Builds a simple Abstract Syntax Tree representation
         /// Returns root node of the AST
         /// </summary>
-        public ASTNode BuildAST()
+        public ASTNode? BuildAST()
         {
             if (Length == 0 || Tokens.Count == 0)
                 return null;
@@ -502,7 +503,7 @@ namespace DigitalBiochemicalSimulator.Core
         /// <summary>
         /// Recursively builds expression tree
         /// </summary>
-        private ASTNode BuildExpressionTree(int start, int end)
+        private ASTNode? BuildExpressionTree(int start, int end)
         {
             if (start > end)
                 return null;
@@ -609,7 +610,7 @@ namespace DigitalBiochemicalSimulator.Core
     public class ChainValidationResult
     {
         public bool IsValid { get; set; }
-        public List<string> Errors { get; set; }
+        public List<string> Errors { get; set; } = new();
 
         public override string ToString()
         {
@@ -626,10 +627,10 @@ namespace DigitalBiochemicalSimulator.Core
     public class ASTNode
     {
         public ASTNodeType NodeType { get; set; }
-        public Token Token { get; set; }
-        public string Value { get; set; }
-        public ASTNode Left { get; set; }
-        public ASTNode Right { get; set; }
+        public Token? Token { get; set; }
+        public string Value { get; set; } = string.Empty;
+        public ASTNode? Left { get; set; }
+        public ASTNode? Right { get; set; }
         public List<ASTNode> Children { get; set; }
 
         public ASTNode()
@@ -673,8 +674,8 @@ namespace DigitalBiochemicalSimulator.Core
         public bool SyntaxValid { get; set; }
         public bool SemanticValid { get; set; }
         public bool IsFullyValid { get; set; }
-        public ChainValidationResult SyntaxResult { get; set; }
-        public object SemanticResult { get; set; } // Will be SemanticValidationResult when available
+        public ChainValidationResult? SyntaxResult { get; set; }
+        public object? SemanticResult { get; set; } // Will be SemanticValidationResult when available
 
         public override string ToString()
         {

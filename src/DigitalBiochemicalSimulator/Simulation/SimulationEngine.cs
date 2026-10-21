@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
@@ -58,6 +59,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Initializes all simulation systems
         /// </summary>
+        [MemberNotNull(nameof(Grid), nameof(TickManager), nameof(TokenPool), nameof(TokenFactory),
+            nameof(ThermalVents), nameof(EnergyManager), nameof(MotionController), nameof(GravitySimulator),
+            nameof(CollisionDetector), nameof(ActiveTokens))]
         private void InitializeSystems()
         {
             // Core systems

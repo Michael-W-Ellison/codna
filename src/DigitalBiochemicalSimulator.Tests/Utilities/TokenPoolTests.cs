@@ -110,7 +110,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             int initialAvailable = pool.AvailableCount;
 
             // Act
-            pool.ReleaseToken(null);
+            pool.ReleaseToken(null!);
 
             // Assert
             Assert.Equal(initialAvailable, pool.AvailableCount);

@@ -19,13 +19,13 @@ namespace DigitalBiochemicalSimulator.Web
         private readonly IntegratedSimulationEngine _simulation;
         private readonly string _webRoot;
         private bool _isRunning;
-        private Thread _serverThread;
+        private Thread? _serverThread;
         private bool _disposed;
 
         public int Port { get; private set; }
         public bool IsRunning => _isRunning;
 
-        public SimulationWebServer(IntegratedSimulationEngine simulation, int port = 8080, string webRoot = null)
+        public SimulationWebServer(IntegratedSimulationEngine simulation, int port = 8080, string? webRoot = null)
         {
             _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
             Port = port;
@@ -117,7 +117,7 @@ namespace DigitalBiochemicalSimulator.Web
                     return;
                 }
 
-                var path = request.Url.AbsolutePath;
+                var path = request.Url?.AbsolutePath ?? "/";
 
                 // API endpoints
                 if (path.StartsWith("/api/"))
@@ -147,7 +147,7 @@ namespace DigitalBiochemicalSimulator.Web
         /// </summary>
         private void HandleApiRequest(string path, HttpListenerRequest request, HttpListenerResponse response)
         {
-            string jsonResponse = null;
+            string jsonResponse;
 
             switch (path)
             {

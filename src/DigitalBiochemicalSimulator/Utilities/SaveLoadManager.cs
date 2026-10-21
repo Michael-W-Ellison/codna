@@ -18,7 +18,7 @@ namespace DigitalBiochemicalSimulator.Utilities
 
         public string DefaultDirectory => _defaultDirectory;
 
-        public SaveLoadManager(string defaultDirectory = null)
+        public SaveLoadManager(string? defaultDirectory = null)
         {
             _defaultDirectory = defaultDirectory ?? Path.Combine(Directory.GetCurrentDirectory(), "saves");
 
@@ -263,7 +263,7 @@ namespace DigitalBiochemicalSimulator.Utilities
                 return Array.Empty<string>();
 
             var files = Directory.GetFiles(_defaultDirectory, "*.json");
-            return files.Select(Path.GetFileNameWithoutExtension).ToArray();
+            return files.Select(file => Path.GetFileNameWithoutExtension(file)).ToArray();
         }
 
         /// <summary>
@@ -290,7 +290,7 @@ namespace DigitalBiochemicalSimulator.Utilities
         /// <summary>
         /// Gets save file metadata without loading full state
         /// </summary>
-        public SaveFileInfo GetSaveInfo(string fileName)
+        public SaveFileInfo? GetSaveInfo(string fileName)
         {
             try
             {
@@ -323,10 +323,10 @@ namespace DigitalBiochemicalSimulator.Utilities
                         info.SavedAt = savedAt.GetDateTime();
 
                     if (metadata.TryGetProperty("description", out var desc))
-                        info.Description = desc.GetString();
+                        info.Description = desc.GetString() ?? string.Empty;
 
                     if (metadata.TryGetProperty("version", out var ver))
-                        info.Version = ver.GetString();
+                        info.Version = ver.GetString() ?? string.Empty;
                 }
 
                 if (root.TryGetProperty("tokens", out var tokens))
@@ -369,9 +369,9 @@ namespace DigitalBiochemicalSimulator.Utilities
             return Path.Combine(_defaultDirectory, fileName);
         }
 
-        private void EnsureDirectoryExists(string path)
+        private void EnsureDirectoryExists(string? path)
         {
-            if (!Directory.Exists(path))
+            if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
             {
                 Directory.CreateDirectory(path);
             }
@@ -384,10 +384,10 @@ namespace DigitalBiochemicalSimulator.Utilities
     public class SaveResult
     {
         public bool Success { get; set; }
-        public string FilePath { get; set; }
+        public string FilePath { get; set; } = string.Empty;
         public long FileSizeBytes { get; set; }
         public long SaveDurationMs { get; set; }
-        public string ErrorMessage { get; set; }
+        public string? ErrorMessage { get; set; }
 
         public string FileSizeFormatted => FormatBytes(FileSizeBytes);
 
@@ -418,10 +418,10 @@ namespace DigitalBiochemicalSimulator.Utilities
     public class LoadResult
     {
         public bool Success { get; set; }
-        public SimulationState State { get; set; }
-        public string FilePath { get; set; }
+        public SimulationState? State { get; set; }
+        public string FilePath { get; set; } = string.Empty;
         public long LoadDurationMs { get; set; }
-        public string ErrorMessage { get; set; }
+        public string? ErrorMessage { get; set; }
 
         public override string ToString()
         {
@@ -436,14 +436,14 @@ namespace DigitalBiochemicalSimulator.Utilities
     /// </summary>
     public class SaveFileInfo
     {
-        public string FileName { get; set; }
-        public string FilePath { get; set; }
+        public string FileName { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
         public long FileSizeBytes { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime ModifiedAt { get; set; }
         public DateTime SavedAt { get; set; }
-        public string Description { get; set; }
-        public string Version { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
         public long CurrentTick { get; set; }
         public int TokenCount { get; set; }
         public int ChainCount { get; set; }

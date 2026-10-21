@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
@@ -87,6 +88,12 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Initializes all simulation systems
         /// </summary>
+        [MemberNotNull(nameof(Grid), nameof(TickManager), nameof(TokenPool), nameof(TokenFactory),
+            nameof(ThermalVents), nameof(EnergyManager), nameof(MotionController), nameof(GravitySimulator),
+            nameof(CollisionDetector), nameof(BondRulesEngine), nameof(BondStrengthCalculator),
+            nameof(BondingManager), nameof(RepulsionHandler), nameof(ChainStabilityCalculator),
+            nameof(ChainRegistry), nameof(DamageSystem), nameof(CellProcessor), nameof(Statistics),
+            nameof(Analytics), nameof(ChainAnalyzer), nameof(_latestAnalysis), nameof(ActiveTokens))]
         private void InitializeSystems()
         {
             // Core systems
@@ -525,7 +532,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Gets the longest valid chain
         /// </summary>
-        public TokenChain GetLongestChain()
+        public TokenChain? GetLongestChain()
         {
             return ChainRegistry.GetLongestChain();
         }
@@ -533,7 +540,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Gets the most stable chain
         /// </summary>
-        public TokenChain GetMostStableChain()
+        public TokenChain? GetMostStableChain()
         {
             return ChainRegistry.GetMostStableChain();
         }
@@ -637,6 +644,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         public static IntegratedSimulationEngine RestoreFromState(SimulationState state)
         {
+            if (state?.Configuration == null)
+                throw new ArgumentException("Simulation state has no configuration", nameof(state));
+
             // Reconstruct configuration
             var config = ReconstructConfig(state.Configuration);
 

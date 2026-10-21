@@ -43,7 +43,7 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var tracker = new EvolutionTracker();
 
             // Act
-            tracker.RecordChainFormation(null, tick: 100);
+            tracker.RecordChainFormation(null!, tick: 100);
 
             // Assert
             Assert.Equal(0, tracker.LineageCount);
@@ -123,7 +123,7 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var tracker = new EvolutionTracker();
 
             // Act
-            var fitness = tracker.CalculateFitness(null, currentTick: 100);
+            var fitness = tracker.CalculateFitness(null!, currentTick: 100);
 
             // Assert
             Assert.Equal(0, fitness);

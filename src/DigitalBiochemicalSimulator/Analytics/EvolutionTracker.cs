@@ -189,7 +189,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         /// <summary>
         /// Gets the lineage of a specific chain
         /// </summary>
-        public ChainLineage GetLineage(long chainId)
+        public ChainLineage? GetLineage(long chainId)
         {
             lock (_trackerLock)
             {
@@ -289,8 +289,8 @@ namespace DigitalBiochemicalSimulator.Analytics
                         ? _lineages.Values.Max(l => l.PeakStability)
                         : 0,
                     UniquePatterns = _history
-                        .Where(s => s?.Pattern?.Hash != null)
-                        .Select(s => s.Pattern.Hash)
+                        .Select(s => s?.Pattern?.Hash)
+                        .Where(hash => hash != null)
                         .Distinct()
                         .Count()
                 };
@@ -312,7 +312,7 @@ namespace DigitalBiochemicalSimulator.Analytics
                 // Data rows
                 foreach (var snapshot in _history.OrderBy(s => s.Tick))
                 {
-                    var patternHash = snapshot?.Pattern?.Hash ?? "";
+                    var patternHash = snapshot.Pattern?.Hash ?? "";
                     csv.AppendLine($"{snapshot.ChainId},{snapshot.Tick},{snapshot.Length}," +
                                  $"{snapshot.Stability:F2},{snapshot.Fitness:F2}," +
                                  $"\"{patternHash}\"");
@@ -351,9 +351,9 @@ namespace DigitalBiochemicalSimulator.Analytics
         public int PeakLength { get; set; }
         public float InitialStability { get; set; }
         public float PeakStability { get; set; }
-        public ChainPattern Pattern { get; set; }
-        public List<long> ParentIds { get; set; }
-        public string DeathReason { get; set; }
+        public ChainPattern? Pattern { get; set; }
+        public List<long> ParentIds { get; set; } = new();
+        public string? DeathReason { get; set; }
     }
 
     /// <summary>
@@ -365,7 +365,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         public long Tick { get; set; }
         public int Length { get; set; }
         public float Stability { get; set; }
-        public ChainPattern Pattern { get; set; }
+        public ChainPattern? Pattern { get; set; }
         public double Fitness { get; set; }
     }
 
@@ -378,7 +378,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         public List<TokenType> TokenTypes { get; set; }
         public List<string> TokenValues { get; set; }
         public int UniqueTokenTypes { get; set; }
-        public string Hash { get; set; }
+        public string? Hash { get; set; }
 
         public ChainPattern()
         {
@@ -392,7 +392,7 @@ namespace DigitalBiochemicalSimulator.Analytics
     /// </summary>
     public class PatternFrequency
     {
-        public ChainPattern Pattern { get; set; }
+        public ChainPattern? Pattern { get; set; }
         public int Count { get; set; }
         public double TotalFitness { get; set; }
         public double AverageFitness { get; set; }

@@ -224,7 +224,8 @@ namespace DigitalBiochemicalSimulator.Chemistry
             chain1.LastModifiedAt = currentTick;
 
             // Update all tokens in chain2 to point to chain1
-            UpdateChainReferences(chain2.Head, chain1);
+            if (chain2.Head != null)
+                UpdateChainReferences(chain2.Head, chain1);
 
             // Remove chain2 from active chains
             _activeChains.Remove(chain2);
@@ -309,7 +310,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         public void DistributeEnergyToChain(Token token, int energyPerBond)
         {
             var chain = FindChainContaining(token);
-            if (chain == null || chain.Length < 2)
+            if (chain == null || chain.Head == null || chain.Length < 2)
                 return;
 
             int totalEnergy = (chain.Length - 1) * energyPerBond;
@@ -393,7 +394,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
             else
             {
                 // Chain still connected, just update metadata
-                chain.Length = CalculateChainLength(chain.Head);
+                chain.Length = chain.Head != null ? CalculateChainLength(chain.Head) : 0;
                 chain.LastModifiedAt = currentTick;
                 RecalculateChainStrength(chain);
             }
@@ -451,7 +452,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Creates a chain starting from a head token
         /// </summary>
-        private TokenChain CreateChainFromHead(Token head, long currentTick)
+        private TokenChain? CreateChainFromHead(Token head, long currentTick)
         {
             if (head == null || head.BondedTokens.Count == 0)
                 return null;
@@ -537,7 +538,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Gets the chain containing a specific token, or null if it is not in a chain
         /// </summary>
-        public TokenChain GetTokenChain(Token token)
+        public TokenChain? GetTokenChain(Token token)
         {
             return FindChainContaining(token);
         }
@@ -545,7 +546,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the chain containing a specific token
         /// </summary>
-        private TokenChain FindChainContaining(Token token)
+        private TokenChain? FindChainContaining(Token token)
         {
             if (token == null)
                 return null;

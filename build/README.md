@@ -111,7 +111,7 @@ Arguments:
 ### Framework-Dependent
 
 **Characteristics:**
-- ❌ Requires .NET 6.0 runtime on target machine
+- ❌ Requires .NET 10.0 runtime on target machine
 - ✅ Smaller file size (~1-5 MB)
 - ✅ Faster startup time
 - ❌ More complex deployment
@@ -175,7 +175,7 @@ This will create builds for Windows, Linux, and macOS in the output directory.
 ### Build Machine
 
 **Minimum:**
-- .NET 6.0 SDK or later
+- .NET 10.0 SDK or later
 - 2 GB free disk space
 - 4 GB RAM
 
@@ -221,7 +221,7 @@ output/
 
 ### Build Fails with "SDK Not Found"
 
-**Solution:** Install .NET 6.0 SDK or later from https://dotnet.microsoft.com/download
+**Solution:** Install .NET 10.0 SDK or later from https://dotnet.microsoft.com/download
 
 ### PowerShell Script Won't Run
 
