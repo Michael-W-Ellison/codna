@@ -101,7 +101,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 var position = GetVentPosition(i);
                 var vent = new ThermalVent(position, TokenFactory,
-                    Config.VentEmissionRate, Config.InitialTokenEnergy);
+                    Config.VentEmissionRate, Config.InitialTokenEnergy)
+                {
+                    TokensPerEmission = Config.TokenGenerationRate
+                };
 
                 // Set distribution based on config
                 if (Config.TokenDistribution == TokenDistributionProfile.ExpressionHeavy)
@@ -216,8 +219,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             foreach (var vent in ThermalVents)
             {
-                var token = vent.GenerateToken(TickManager.CurrentTick);
-                if (token != null)
+                foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
                     Grid.AddToken(token);
                     ActiveTokens.Add(token);

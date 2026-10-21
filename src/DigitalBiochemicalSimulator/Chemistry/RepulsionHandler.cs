@@ -240,7 +240,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
             // Get neighboring cells (8 horizontal neighbors)
             var neighbors = _grid.GetNeighbors(currentCell.Position)
-                .Where(n => n.Position.Y == currentCell.Position.Y) // Same altitude
+                .Where(n => n.Position.Z == currentCell.Position.Z) // Same altitude
                 .ToList();
 
             if (neighbors.Count == 0)

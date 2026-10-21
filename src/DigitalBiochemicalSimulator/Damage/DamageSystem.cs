@@ -11,19 +11,16 @@ namespace DigitalBiochemicalSimulator.Damage
     /// Manages altitude-based damage and metadata corruption for tokens.
     /// Based on section 4.1 of the design specification.
     ///
-    /// Damage formula: BASE_DAMAGE * (altitude / MAX_HEIGHT)^EXPONENT
-    /// Higher altitude = more damage
+    /// Damage formula: BaseDamageRate * DamageMultiplier * (altitude / MAX_HEIGHT)^DamageExponent
+    /// Higher altitude = more damage. Altitude is the Z coordinate; MAX_HEIGHT is GridDepth.
+    /// Only tokens within MutationRange cells of the top receive damage, with MutationRate
+    /// attempts per tick. MutationFalloff.Abrupt uses a constant rate within the range.
     /// </summary>
     public class DamageSystem
     {
         private readonly SimulationConfig _config;
         private readonly BondingManager _bondingManager;
         private readonly Random _random;
-
-        // Damage parameters
-        private const float BASE_DAMAGE_RATE = 0.01f;    // 1% base damage per tick at max altitude
-        private const float DAMAGE_EXPONENT = 2.0f;       // Quadratic scaling
-        private const float CRITICAL_DAMAGE_THRESHOLD = 0.8f; // 80% damage = critical
 
         // Corruption probabilities
         private const float OBFUSCATION_PROBABILITY = 0.40f;  // 40%
@@ -32,7 +29,7 @@ namespace DigitalBiochemicalSimulator.Damage
 
         public DamageSystem(SimulationConfig config, BondingManager bondingManager)
         {
-            _config = config;
+            _config = config ?? throw new ArgumentNullException(nameof(config));
             _bondingManager = bondingManager;
             _random = new Random();
         }
@@ -46,13 +43,18 @@ namespace DigitalBiochemicalSimulator.Damage
                 return;
 
             // Calculate damage rate based on altitude
-            float damageRate = CalculateDamageRate(token.Position.Y);
+            float damageRate = CalculateDamageRate(token.Position.Z);
+            if (damageRate <= 0.0f)
+                return;
 
-            // Apply probabilistic damage
-            if (_random.NextDouble() < damageRate)
+            // Apply probabilistic damage, MutationRate attempts per tick
+            for (int attempt = 0; attempt < _config.MutationRate && token.IsActive; attempt++)
             {
-                // Increase damage level
-                float damageIncrease = (float)_random.NextDouble() * 0.1f; // 0-10% increase
+                if (_random.NextDouble() >= damageRate)
+                    continue;
+
+                // Increase damage level (0 to DamageIncrement)
+                float damageIncrease = (float)_random.NextDouble() * _config.DamageIncrement;
                 token.DamageLevel = Math.Min(1.0f, token.DamageLevel + damageIncrease);
                 token.IsDamaged = token.DamageLevel > 0.0f;
 
@@ -60,7 +62,7 @@ namespace DigitalBiochemicalSimulator.Damage
                 ApplyCorruption(token);
 
                 // Check if damage is critical
-                if (token.DamageLevel >= CRITICAL_DAMAGE_THRESHOLD)
+                if (token.DamageLevel >= _config.CriticalDamageThreshold)
                 {
                     HandleCriticalDamage(token, currentTick);
                 }
@@ -68,21 +70,31 @@ namespace DigitalBiochemicalSimulator.Damage
         }
 
         /// <summary>
-        /// Calculates the damage rate based on altitude
-        /// Formula: BASE_DAMAGE * (altitude / MAX_HEIGHT)^EXPONENT
+        /// Calculates the per-attempt damage probability at an altitude (Z coordinate)
+        /// Formula: BaseDamageRate * DamageMultiplier * (altitude / MAX_HEIGHT)^DamageExponent
         /// </summary>
-        private float CalculateDamageRate(int altitude)
+        public float CalculateDamageRate(int altitude)
         {
-            if (_config == null || _config.GridHeight == 0)
-                return BASE_DAMAGE_RATE;
+            if (_config.GridDepth <= 0)
+                return 0.0f;
 
-            // Normalize altitude (0.0 to 1.0)
-            float normalizedAltitude = (float)altitude / _config.GridHeight;
+            // Only the top MutationRange layers are in the mutation zone
+            if (altitude < _config.GridDepth - _config.MutationRange)
+                return 0.0f;
+
+            float baseRate = _config.BaseDamageRate * _config.DamageMultiplier;
+
+            if (_config.MutationFalloff == MutationFalloff.Abrupt)
+                return Math.Clamp(baseRate, 0.0f, 1.0f);
+
+            // Normalize altitude (0.0 to 1.0); the top layer is GridDepth - 1
+            float maxAltitude = Math.Max(1, _config.GridDepth - 1);
+            float normalizedAltitude = Math.Clamp(altitude / maxAltitude, 0.0f, 1.0f);
 
             // Apply exponential scaling
-            float scaledAltitude = (float)Math.Pow(normalizedAltitude, DAMAGE_EXPONENT);
+            float scaledAltitude = (float)Math.Pow(normalizedAltitude, _config.DamageExponent);
 
-            return BASE_DAMAGE_RATE * scaledAltitude;
+            return Math.Clamp(baseRate * scaledAltitude, 0.0f, 1.0f);
         }
 
         /// <summary>
@@ -374,7 +386,7 @@ namespace DigitalBiochemicalSimulator.Damage
             {
                 TotalTokens = activeTokens.Count,
                 DamagedTokens = activeTokens.Count(t => t.IsDamaged),
-                CriticallyDamagedTokens = activeTokens.Count(t => t.DamageLevel >= CRITICAL_DAMAGE_THRESHOLD),
+                CriticallyDamagedTokens = activeTokens.Count(t => t.DamageLevel >= _config.CriticalDamageThreshold),
                 AverageDamageLevel = activeTokens.Count > 0
                     ? activeTokens.Average(t => t.DamageLevel)
                     : 0.0f,

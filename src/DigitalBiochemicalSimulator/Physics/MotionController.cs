@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
@@ -13,6 +14,7 @@ namespace DigitalBiochemicalSimulator.Physics
     {
         private SimulationConfig _config;
         private Grid _grid;
+        private readonly Random _random = new Random();
 
         public MotionController(SimulationConfig config, Grid grid)
         {
@@ -101,6 +103,22 @@ namespace DigitalBiochemicalSimulator.Physics
         }
 
         /// <summary>
+        /// Cells to fall this tick: FallRate scaled by GravityStrength. A fractional
+        /// remainder is applied as a probability (e.g. 0.5 falls one cell on half the ticks).
+        /// </summary>
+        private int CalculateFallDistance()
+        {
+            float distance = _config.FallRate * _config.GravityStrength;
+            int whole = (int)distance;
+            float fraction = distance - whole;
+
+            if (fraction > 0 && _random.NextDouble() < fraction)
+                whole++;
+
+            return whole;
+        }
+
+        /// <summary>
         /// Moves token downward (no energy cost)
         /// </summary>
         private void MoveTokenDown(Token token)
@@ -112,7 +130,14 @@ namespace DigitalBiochemicalSimulator.Physics
                 return;
             }
 
-            var newPosition = token.Position + new Vector3Int(0, 0, -_config.FallRate);
+            int fallDistance = CalculateFallDistance();
+            if (fallDistance <= 0)
+            {
+                token.Velocity = Vector3Int.Zero;
+                return;
+            }
+
+            var newPosition = token.Position + new Vector3Int(0, 0, -fallDistance);
 
             // Ensure we don't go below 0
             if (newPosition.Z < 0)

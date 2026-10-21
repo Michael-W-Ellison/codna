@@ -70,9 +70,42 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int GridDepth { get; set; }
         public int CellCapacity { get; set; }
         public int MaxTokens { get; set; }
-        public int TokenGenerationRate { get; set; }
+        public int? TokenGenerationRate { get; set; }
         public int TicksPerSecond { get; set; }
-        public float GravityStrength { get; set; }
+        public float? GravityStrength { get; set; }
+
+        // Remaining settings; null when loading a save written before they were stored
+        public int? InitialTokenEnergy { get; set; }
+        public int? EnergyPerTick { get; set; }
+        public int? RiseRate { get; set; }
+        public int? FallRate { get; set; }
+        public bool? GravityEnabled { get; set; }
+        public int? EnvironmentViscosity { get; set; }
+        public int? VentEmissionRate { get; set; }
+        public int? NumberOfVents { get; set; }
+        public VentDistribution? VentDistribution { get; set; }
+        public float? MinBondStrength { get; set; }
+        public int? BondingRadius { get; set; }
+        public float? BondingRange { get; set; }
+        public int? EnergyPerBond { get; set; }
+        public float? CovalentBondStrength { get; set; }
+        public float? IonicBondStrength { get; set; }
+        public float? VanDerWaalsBondStrength { get; set; }
+        public float? BaseDamageRate { get; set; }
+        public float? DamageExponent { get; set; }
+        public float? CriticalDamageThreshold { get; set; }
+        public float? DamageIncrement { get; set; }
+        public float? DamageMultiplier { get; set; }
+        public int? MutationRange { get; set; }
+        public int? MutationRate { get; set; }
+        public MutationFalloff? MutationFalloff { get; set; }
+        public int? MinValidationLength { get; set; }
+        public int? StabilityThreshold { get; set; }
+        public int? ValidationFrequency { get; set; }
+        public int? MaxChains { get; set; }
+        public TokenDistributionProfile? TokenDistribution { get; set; }
+        public Vector3IntState? VentPosition { get; set; }
+
         public Dictionary<string, object> AdditionalSettings { get; set; }
 
         public SimulationConfigState()
@@ -91,7 +124,37 @@ namespace DigitalBiochemicalSimulator.Simulation
                 MaxTokens = config.MaxTokens,
                 TokenGenerationRate = config.TokenGenerationRate,
                 TicksPerSecond = config.TicksPerSecond,
-                GravityStrength = config.GravityStrength
+                GravityStrength = config.GravityStrength,
+                InitialTokenEnergy = config.InitialTokenEnergy,
+                EnergyPerTick = config.EnergyPerTick,
+                RiseRate = config.RiseRate,
+                FallRate = config.FallRate,
+                GravityEnabled = config.GravityEnabled,
+                EnvironmentViscosity = config.EnvironmentViscosity,
+                VentEmissionRate = config.VentEmissionRate,
+                NumberOfVents = config.NumberOfVents,
+                VentDistribution = config.VentDistribution,
+                MinBondStrength = config.MinBondStrength,
+                BondingRadius = config.BondingRadius,
+                BondingRange = config.BondingRange,
+                EnergyPerBond = config.EnergyPerBond,
+                CovalentBondStrength = config.CovalentBondStrength,
+                IonicBondStrength = config.IonicBondStrength,
+                VanDerWaalsBondStrength = config.VanDerWaalsBondStrength,
+                BaseDamageRate = config.BaseDamageRate,
+                DamageExponent = config.DamageExponent,
+                CriticalDamageThreshold = config.CriticalDamageThreshold,
+                DamageIncrement = config.DamageIncrement,
+                DamageMultiplier = config.DamageMultiplier,
+                MutationRange = config.MutationRange,
+                MutationRate = config.MutationRate,
+                MutationFalloff = config.MutationFalloff,
+                MinValidationLength = config.MinValidationLength,
+                StabilityThreshold = config.StabilityThreshold,
+                ValidationFrequency = config.ValidationFrequency,
+                MaxChains = config.MaxChains,
+                TokenDistribution = config.TokenDistribution,
+                VentPosition = new Vector3IntState { X = config.VentPosition.X, Y = config.VentPosition.Y, Z = config.VentPosition.Z }
             };
         }
     }

@@ -125,7 +125,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             DamageSystem = new DamageSystem(Config, BondingManager);
 
             // Integration systems
-            CellProcessor = new CellProcessor(BondingManager, RepulsionHandler, Config);
+            CellProcessor = new CellProcessor(BondingManager, RepulsionHandler, Config, Grid);
 
             // Initialize thermal vents
             ThermalVents = new List<ThermalVent>();
@@ -164,7 +164,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 var position = GetVentPosition(i);
                 var vent = new ThermalVent(position, TokenFactory,
-                    Config.VentEmissionRate, Config.InitialTokenEnergy);
+                    Config.VentEmissionRate, Config.InitialTokenEnergy)
+                {
+                    TokensPerEmission = Config.TokenGenerationRate
+                };
 
                 // Set distribution based on config
                 if (Config.TokenDistribution == TokenDistributionProfile.ExpressionHeavy)
@@ -188,18 +191,18 @@ namespace DigitalBiochemicalSimulator.Simulation
             switch (Config.VentDistribution)
             {
                 case VentDistribution.Central:
-                    return new Vector3Int(Config.GridWidth / 2, 0, Config.GridDepth / 2);
+                    return new Vector3Int(Config.GridWidth / 2, Config.GridHeight / 2, 0);
 
                 case VentDistribution.Distributed:
                     int spacing = Config.GridWidth / (Config.NumberOfVents + 1);
-                    return new Vector3Int(spacing * (ventIndex + 1), 0, Config.GridDepth / 2);
+                    return new Vector3Int(spacing * (ventIndex + 1), Config.GridHeight / 2, 0);
 
                 case VentDistribution.Random:
                     var random = new Random();
                     return new Vector3Int(
                         random.Next(0, Config.GridWidth),
-                        0,
-                        random.Next(0, Config.GridDepth)
+                        random.Next(0, Config.GridHeight),
+                        0
                     );
 
                 default:
@@ -234,7 +237,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Main simulation loop - processes one tick
+        /// Main simulation loop - processes one tick once the tick duration has elapsed
         /// Fully integrated version with all systems
         /// </summary>
         public void Update()
@@ -242,6 +245,14 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (!IsRunning || !TickManager.ShouldTick())
                 return;
 
+            Step();
+        }
+
+        /// <summary>
+        /// Processes exactly one tick, without waiting for the tick duration to elapse
+        /// </summary>
+        public void Step()
+        {
             TickManager.Tick();
             long currentTick = TickManager.CurrentTick;
 
@@ -285,8 +296,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             foreach (var vent in ThermalVents)
             {
-                var token = vent.GenerateToken(TickManager.CurrentTick);
-                if (token != null)
+                foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
                     Grid.AddToken(token);
                     ActiveTokens.Add(token);
@@ -347,13 +357,105 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         private void UpdateChains(long currentTick)
         {
-            // Update stability scores for all chains
+            // Track the chains formed by the bonding manager
+            SyncChainRegistry();
+
+            // Update stability scores for all chains (removes extremely unstable chains)
             ChainRegistry.UpdateAllStabilities(currentTick);
 
             // Prune stale chains periodically (every 100 ticks)
             if (currentTick % 100 == 0)
             {
                 ChainRegistry.PruneStaleChains(currentTick, maxAge: 1000);
+            }
+
+            // Validate chains every ValidationFrequency ticks
+            if (Config.ValidationFrequency > 0 && currentTick % Config.ValidationFrequency == 0)
+            {
+                ValidateChains(currentTick);
+            }
+
+            EnforceChainLimit();
+
+            // Chains the registry dropped (unstable, stale, invalid, or over the limit) break apart
+            DissolveUntrackedChains(currentTick);
+        }
+
+        /// <summary>
+        /// Makes the chain registry match the bonding manager's active chains
+        /// </summary>
+        private void SyncChainRegistry()
+        {
+            var activeChains = BondingManager.GetActiveChains();
+            var activeIds = new HashSet<long>(activeChains.Select(c => c.Id));
+
+            foreach (var chain in ChainRegistry.GetAllChains())
+            {
+                if (!activeIds.Contains(chain.Id))
+                    ChainRegistry.RemoveChain(chain.Id);
+            }
+
+            foreach (var chain in activeChains)
+            {
+                if (ChainRegistry.GetChain(chain.Id) != chain)
+                    ChainRegistry.RegisterChain(chain);
+            }
+        }
+
+        /// <summary>
+        /// Validates chains that have reached MinValidationLength and have not bonded for
+        /// StabilityThreshold ticks; chains that fail validation are removed from the registry
+        /// </summary>
+        internal void ValidateChains(long currentTick)
+        {
+            foreach (var chain in ChainRegistry.GetAllChains())
+            {
+                if (chain.Length < Config.MinValidationLength)
+                    continue;
+
+                if (currentTick - chain.LastModifiedTick < Config.StabilityThreshold)
+                    continue;
+
+                if (!chain.ValidateChain().IsValid)
+                    ChainRegistry.RemoveChain(chain.Id);
+            }
+        }
+
+        /// <summary>
+        /// Removes the least stable chains from the registry while it holds more than MaxChains
+        /// </summary>
+        private void EnforceChainLimit()
+        {
+            int excess = ChainRegistry.Count - Config.MaxChains;
+            if (excess <= 0)
+                return;
+
+            foreach (var chain in ChainRegistry.GetChainsByStability().AsEnumerable().Reverse().Take(excess).ToList())
+            {
+                ChainRegistry.RemoveChain(chain.Id);
+            }
+        }
+
+        /// <summary>
+        /// Breaks the bonds of every active chain that is no longer in the chain registry
+        /// </summary>
+        private void DissolveUntrackedChains(long currentTick)
+        {
+            foreach (var chain in BondingManager.GetActiveChains())
+            {
+                if (ChainRegistry.GetChain(chain.Id) == chain)
+                    continue;
+
+                foreach (var token in chain.Tokens.ToList())
+                {
+                    foreach (var bonded in token.BondedTokens.ToList())
+                    {
+                        if (BondingManager.BreakBond(token, bonded, currentTick))
+                            TotalBondsBroken++;
+                    }
+                }
+
+                BondingManager.RemoveChain(chain);
             }
         }
 
@@ -371,7 +473,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         private void RemoveInactiveTokens()
         {
-            var tokensToRemove = ActiveTokens.Where(t => !t.IsActive || t.Position.Y < 0).ToList();
+            var tokensToRemove = ActiveTokens.Where(t => !t.IsActive || t.Position.Z < 0).ToList();
 
             foreach (var token in tokensToRemove)
             {
@@ -403,7 +505,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 // Remove oldest falling tokens first
                 var tokenToRemove = ActiveTokens
                     .Where(t => t.Energy == 0)
-                    .OrderBy(t => t.Position.Y)
+                    .OrderBy(t => t.Position.Z)
                     .FirstOrDefault();
 
                 if (tokenToRemove != null)
@@ -722,6 +824,41 @@ namespace DigitalBiochemicalSimulator.Simulation
                 MaxActiveTokens = configState.MaxTokens,
                 TicksPerSecond = configState.TicksPerSecond
             };
+
+            // Fields added after the first save format are only applied when present
+            if (configState.TokenGenerationRate.HasValue) config.TokenGenerationRate = configState.TokenGenerationRate.Value;
+            if (configState.GravityStrength.HasValue) config.GravityStrength = configState.GravityStrength.Value;
+            if (configState.InitialTokenEnergy.HasValue) config.InitialTokenEnergy = configState.InitialTokenEnergy.Value;
+            if (configState.EnergyPerTick.HasValue) config.EnergyPerTick = configState.EnergyPerTick.Value;
+            if (configState.RiseRate.HasValue) config.RiseRate = configState.RiseRate.Value;
+            if (configState.FallRate.HasValue) config.FallRate = configState.FallRate.Value;
+            if (configState.GravityEnabled.HasValue) config.GravityEnabled = configState.GravityEnabled.Value;
+            if (configState.EnvironmentViscosity.HasValue) config.EnvironmentViscosity = configState.EnvironmentViscosity.Value;
+            if (configState.VentEmissionRate.HasValue) config.VentEmissionRate = configState.VentEmissionRate.Value;
+            if (configState.NumberOfVents.HasValue) config.NumberOfVents = configState.NumberOfVents.Value;
+            if (configState.VentDistribution.HasValue) config.VentDistribution = configState.VentDistribution.Value;
+            if (configState.MinBondStrength.HasValue) config.MinBondStrength = configState.MinBondStrength.Value;
+            if (configState.BondingRadius.HasValue) config.BondingRadius = configState.BondingRadius.Value;
+            if (configState.BondingRange.HasValue) config.BondingRange = configState.BondingRange.Value;
+            if (configState.EnergyPerBond.HasValue) config.EnergyPerBond = configState.EnergyPerBond.Value;
+            if (configState.CovalentBondStrength.HasValue) config.CovalentBondStrength = configState.CovalentBondStrength.Value;
+            if (configState.IonicBondStrength.HasValue) config.IonicBondStrength = configState.IonicBondStrength.Value;
+            if (configState.VanDerWaalsBondStrength.HasValue) config.VanDerWaalsBondStrength = configState.VanDerWaalsBondStrength.Value;
+            if (configState.BaseDamageRate.HasValue) config.BaseDamageRate = configState.BaseDamageRate.Value;
+            if (configState.DamageExponent.HasValue) config.DamageExponent = configState.DamageExponent.Value;
+            if (configState.CriticalDamageThreshold.HasValue) config.CriticalDamageThreshold = configState.CriticalDamageThreshold.Value;
+            if (configState.DamageIncrement.HasValue) config.DamageIncrement = configState.DamageIncrement.Value;
+            if (configState.DamageMultiplier.HasValue) config.DamageMultiplier = configState.DamageMultiplier.Value;
+            if (configState.MutationRange.HasValue) config.MutationRange = configState.MutationRange.Value;
+            if (configState.MutationRate.HasValue) config.MutationRate = configState.MutationRate.Value;
+            if (configState.MutationFalloff.HasValue) config.MutationFalloff = configState.MutationFalloff.Value;
+            if (configState.MinValidationLength.HasValue) config.MinValidationLength = configState.MinValidationLength.Value;
+            if (configState.StabilityThreshold.HasValue) config.StabilityThreshold = configState.StabilityThreshold.Value;
+            if (configState.ValidationFrequency.HasValue) config.ValidationFrequency = configState.ValidationFrequency.Value;
+            if (configState.MaxChains.HasValue) config.MaxChains = configState.MaxChains.Value;
+            if (configState.TokenDistribution.HasValue) config.TokenDistribution = configState.TokenDistribution.Value;
+            if (configState.VentPosition != null)
+                config.VentPosition = new Vector3Int(configState.VentPosition.X, configState.VentPosition.Y, configState.VentPosition.Z);
 
             return config;
         }

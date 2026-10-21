@@ -87,8 +87,14 @@ namespace DigitalBiochemicalSimulator.Grammar
             if (Pattern.Count < 2)
                 return false;
 
-            // Check if the two tokens match the first two patterns
-            return Pattern[0].Matches(token1.Type) && Pattern[1].Matches(token2.Type);
+            // Check if the two tokens match any two adjacent patterns
+            for (int i = 0; i < Pattern.Count - 1; i++)
+            {
+                if (Pattern[i].Matches(token1.Type) && Pattern[i + 1].Matches(token2.Type))
+                    return true;
+            }
+
+            return false;
         }
 
         public override string ToString()

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
@@ -15,12 +16,17 @@ namespace DigitalBiochemicalSimulator.Simulation
         private readonly BondingManager _bondingManager;
         private readonly RepulsionHandler _repulsionHandler;
         private readonly SimulationConfig _config;
+        private readonly Grid? _grid;
 
-        public CellProcessor(BondingManager bondingManager, RepulsionHandler repulsionHandler, SimulationConfig config)
+        /// <param name="grid">Grid used to find bonding partners in other cells when the
+        /// configured bonding range is above 0; without it bonding stays within a cell</param>
+        public CellProcessor(BondingManager bondingManager, RepulsionHandler repulsionHandler, SimulationConfig config,
+                             Grid? grid = null)
         {
             _bondingManager = bondingManager;
             _repulsionHandler = repulsionHandler;
             _config = config;
+            _grid = grid;
         }
 
         /// <summary>
@@ -28,7 +34,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         public int AttemptBonding(Cell cell, long currentTick)
         {
-            if (cell == null || cell.Tokens.Count < 2)
+            if (cell == null || cell.Tokens.Count == 0)
                 return 0;
 
             int bondsFormed = 0;
@@ -49,6 +55,44 @@ namespace DigitalBiochemicalSimulator.Simulation
 
                     // Attempt to bond
                     if (_bondingManager.AttemptBond(token1, token2, currentTick))
+                    {
+                        bondsFormed++;
+                    }
+                }
+            }
+
+            bondsFormed += AttemptBondingInRange(cell, tokens, currentTick);
+
+            return bondsFormed;
+        }
+
+        /// <summary>
+        /// Attempts bonds between tokens in a cell and tokens in other cells within the
+        /// configured bonding range (Euclidean distance between cell positions)
+        /// </summary>
+        private int AttemptBondingInRange(Cell cell, List<Token> tokens, long currentTick)
+        {
+            float range = _config?.EffectiveBondingRange ?? 0.0f;
+            if (_grid == null || range <= 0.0f)
+                return 0;
+
+            // Manhattan radius that covers the Euclidean range
+            int searchRadius = (int)Math.Ceiling(range * Math.Sqrt(3));
+            var candidates = _grid.GetTokensInRadius(cell.Position, searchRadius)
+                .Where(t => t.IsActive && t.Position != cell.Position && cell.Position.Distance(t.Position) <= range)
+                .ToList();
+
+            int bondsFormed = 0;
+
+            foreach (var token in tokens)
+            {
+                foreach (var partner in candidates)
+                {
+                    // Each cross-cell pair is attempted once, from the token with the lower ID
+                    if (partner.Id <= token.Id || token.BondedTokens.Contains(partner))
+                        continue;
+
+                    if (_bondingManager.AttemptBond(token, partner, currentTick))
                     {
                         bondsFormed++;
                     }

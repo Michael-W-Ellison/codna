@@ -55,8 +55,8 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Performance Configuration
         public int MaxActiveTokens { get; set; } = 1000;
         public int MaxChains { get; set; } = 200;
-        public int TickDuration { get; set; } = 100;  // milliseconds
         public int TicksPerSecond { get; set; } = 10;
+        public int TickDuration => TicksPerSecond > 0 ? 1000 / TicksPerSecond : 1000;  // milliseconds, from TicksPerSecond
 
         /// <summary>
         /// Alias for MaxActiveTokens
@@ -67,12 +67,22 @@ namespace DigitalBiochemicalSimulator.Simulation
             set => MaxActiveTokens = value;
         }
 
-        // Preset tuning values (stored and saved with the configuration;
-        // not read by the physics, bonding, or damage systems)
+        // Tokens each vent emits per emission (every VentEmissionRate ticks)
         public int TokenGenerationRate { get; set; } = 1;
+
+        // Multiplier on FallRate for falling tokens (fractional cells per tick are applied probabilistically)
         public float GravityStrength { get; set; } = 1.0f;
+
+        // Euclidean distance in cells within which tokens in different cells can bond (0 = same cell only)
         public float BondingRange { get; set; } = 0.0f;
+
+        // Multiplier on BaseDamageRate
         public float DamageMultiplier { get; set; } = 1.0f;
+
+        /// <summary>
+        /// Bonding distance used by the simulation: the larger of BondingRadius and BondingRange
+        /// </summary>
+        public float EffectiveBondingRange => Math.Max(BondingRadius, BondingRange);
 
         // Token Distribution (probabilities for each token category)
         public TokenDistributionProfile TokenDistribution { get; set; } =
@@ -262,6 +272,42 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (MaxChains < 0)
             {
                 errorMessage = "Max chains cannot be negative";
+                return false;
+            }
+
+            if (TokenGenerationRate <= 0)
+            {
+                errorMessage = "Token generation rate must be positive";
+                return false;
+            }
+
+            if (GravityStrength < 0.0f)
+            {
+                errorMessage = "Gravity strength cannot be negative";
+                return false;
+            }
+
+            if (BondingRadius < 0 || BondingRange < 0.0f)
+            {
+                errorMessage = "Bonding radius and range cannot be negative";
+                return false;
+            }
+
+            if (DamageMultiplier < 0.0f)
+            {
+                errorMessage = "Damage multiplier cannot be negative";
+                return false;
+            }
+
+            if (DamageIncrement < 0.0f || DamageIncrement > 1.0f)
+            {
+                errorMessage = "Damage increment must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (MinValidationLength < 0 || StabilityThreshold < 0 || ValidationFrequency < 0)
+            {
+                errorMessage = "Validation settings cannot be negative";
                 return false;
             }
 

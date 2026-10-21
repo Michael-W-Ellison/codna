@@ -18,7 +18,7 @@ namespace DigitalBiochemicalSimulator.Core
         public int TotalEnergy { get; set; }
         public float StabilityScore { get; set; }
         public long LastModifiedTick { get; set; }
-        public long LastModifiedAt { get; set; } // Alias for compatibility
+        public long LastModifiedAt { get => LastModifiedTick; set => LastModifiedTick = value; } // Alias for compatibility
         public long CreatedAt { get; set; }
         public bool IsValid { get; set; }
         public BondType BondType { get; set; }

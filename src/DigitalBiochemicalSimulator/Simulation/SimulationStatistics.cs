@@ -230,7 +230,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             return _allTokens
                 .Where(t => t.IsActive)
-                .GroupBy(t => t.Position.Y)
+                .GroupBy(t => t.Position.Z)
                 .ToDictionary(g => g.Key, g => g.Count());
         }
 

@@ -33,18 +33,31 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Registers a new chain (thread-safe)
+        /// Registers a chain (thread-safe). A chain that already has an ID keeps it and
+        /// replaces any registered chain with the same ID; a chain with no ID (0) is assigned one.
         /// </summary>
         public long RegisterChain(TokenChain chain)
         {
             if (chain == null)
                 return -1;
 
-            long id = System.Threading.Interlocked.Increment(ref _nextChainId);
-            chain.Id = id;
-            _chains[id] = chain;
+            lock (_registryLock)
+            {
+                if (chain.Id <= 0)
+                {
+                    chain.Id = _nextChainId++;
+                    while (_chains.ContainsKey(chain.Id))
+                        chain.Id = _nextChainId++;
+                }
+                else if (chain.Id >= _nextChainId)
+                {
+                    _nextChainId = chain.Id + 1;
+                }
 
-            return id;
+                _chains[chain.Id] = chain;
+            }
+
+            return chain.Id;
         }
 
         /// <summary>
