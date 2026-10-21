@@ -312,17 +312,27 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
         // API Configuration
-        const API_BASE = 'http://localhost:8080/api';
+        // Same origin as the page, so it works on whichever port the server uses
+        const API_BASE = '/api';
+        let gridSize = { width: 50, height: 50, depth: 50 };
         const UPDATE_INTERVAL = 1000; // Update every second
 
         // Three.js Setup
         let scene, camera, renderer, controls;
         let tokenMeshes = [];
         let gridHelper;
+        let viewerReady = false;
 
+        // Sets up the 3D view; returns false (and leaves the statistics panels working)
+        // when Three.js could not be loaded from the CDN
         function initThreeJS() {
             const container = document.getElementById('canvas-container');
             const loading = document.getElementById('loading');
+
+            if (typeof THREE === 'undefined' || typeof THREE.OrbitControls === 'undefined') {
+                loading.textContent = '3D view unavailable: Three.js could not be loaded from the CDN. Statistics still update.';
+                return false;
+            }
 
             // Scene
             scene = new THREE.Scene();
@@ -366,7 +376,24 @@
             window.addEventListener('resize', onWindowResize);
 
             loading.style.display = 'none';
+            viewerReady = true;
             animate();
+            return true;
+        }
+
+        // Resizes the floor grid to the simulation's horizontal dimensions
+        function applyGridSize(size) {
+            if (size.width === gridSize.width && size.height === gridSize.height && size.depth === gridSize.depth) {
+                return;
+            }
+
+            gridSize = size;
+            if (viewerReady) {
+                scene.remove(gridHelper);
+                const extent = Math.max(size.width, size.height);
+                gridHelper = new THREE.GridHelper(extent, extent, 0x667eea, 0x333344);
+                scene.add(gridHelper);
+            }
         }
 
         function animate() {
@@ -383,6 +410,10 @@
         }
 
         function resetView() {
+            if (!viewerReady) {
+                return;
+            }
+
             camera.position.set(30, 30, 30);
             controls.reset();
         }
@@ -413,6 +444,10 @@
                 } else {
                     indicator.className = 'status-indicator status-stopped';
                     statusText.textContent = 'Stopped';
+                }
+
+                if (data.gridSize) {
+                    applyGridSize(data.gridSize);
                 }
 
                 document.getElementById('tick-count').textContent = data.currentTick.toLocaleString();
@@ -461,6 +496,10 @@
         }
 
         async function updateGrid() {
+            if (!viewerReady) {
+                return;
+            }
+
             const data = await fetchAPI('grid');
             if (data && data.cells) {
                 // Remove old meshes
@@ -476,7 +515,8 @@
                         emissiveIntensity: 0.2
                     });
                     const mesh = new THREE.Mesh(geometry, material);
-                    mesh.position.set(cell.x - 25, cell.z, cell.y - 25);
+                    // Altitude is the simulation's Z axis, drawn as the scene's vertical (Y) axis
+                    mesh.position.set(cell.x - gridSize.width / 2, cell.z, cell.y - gridSize.height / 2);
                     scene.add(mesh);
                     tokenMeshes.push(mesh);
                 });
@@ -509,9 +549,13 @@
             window.open(`${API_BASE}/export/csv`, '_blank');
         }
 
-        function togglePause() {
-            // Implemented via simulation control
-            console.log('Pause/Resume functionality requires simulation control API');
+        async function togglePause() {
+            try {
+                await fetch(`${API_BASE}/pause`, { method: 'POST' });
+            } catch (error) {
+                console.error('Error toggling pause:', error);
+            }
+            await updateStatus();
         }
 
         // Update Loop

@@ -1,6 +1,8 @@
 using System;
 using System.Net;
+using System.IO;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using Xunit;
 using DigitalBiochemicalSimulator.Web;
@@ -195,6 +197,104 @@ namespace DigitalBiochemicalSimulator.Tests.Web
 
             // Assert
             Assert.False(_server.IsRunning);
+        }
+
+        [Fact]
+        public void DefaultWebRoot_IsBesideExecutableWithIndexPage()
+        {
+            // Arrange & Act
+            _server = new SimulationWebServer(_simulation, TestPort);
+
+            // Assert - the build copies wwwroot next to the executable
+            Assert.Equal(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "wwwroot")), _server.WebRoot);
+            Assert.True(File.Exists(Path.Combine(_server.WebRoot, "index.html")));
+        }
+
+        [Fact]
+        public async Task Root_ServesIndexPage()
+        {
+            // Arrange
+            _server = new SimulationWebServer(_simulation, TestPort);
+            _server.Start();
+            Thread.Sleep(200);
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
+            // Act
+            var response = await client.GetAsync($"http://localhost:{TestPort}/");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.Contains("const API_BASE = '/api';", content);
+        }
+
+        [Theory]
+        [InlineData("stats", "activeTokenCount", "totalChains", "stableChains", "totalEnergy")]
+        [InlineData("status", "isRunning", "isPaused", "currentTick", "tps")]
+        public async Task Api_UsesFieldNamesThePageReads(string endpoint, params string[] fields)
+        {
+            // Arrange
+            _server = new SimulationWebServer(_simulation, TestPort);
+            _server.Start();
+            Thread.Sleep(200);
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
+            // Act
+            var json = await client.GetStringAsync($"http://localhost:{TestPort}/api/{endpoint}");
+
+            // Assert
+            using var document = JsonDocument.Parse(json);
+            foreach (var field in fields)
+            {
+                Assert.True(document.RootElement.TryGetProperty(field, out _), $"/api/{endpoint} is missing '{field}'");
+            }
+        }
+
+        [Fact]
+        public async Task ApiEvolution_UsesFieldNamesThePageReads()
+        {
+            // Arrange
+            _server = new SimulationWebServer(_simulation, TestPort);
+            _server.Start();
+            Thread.Sleep(200);
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
+            // Act
+            var json = await client.GetStringAsync($"http://localhost:{TestPort}/api/evolution");
+
+            // Assert
+            using var document = JsonDocument.Parse(json);
+            var statistics = document.RootElement.GetProperty("statistics");
+            foreach (var field in new[] { "totalLineages", "uniquePatterns", "longestLineage", "highestStability" })
+            {
+                Assert.True(statistics.TryGetProperty(field, out _), $"/api/evolution statistics is missing '{field}'");
+            }
+        }
+
+        [Fact]
+        public async Task ApiPause_PostTogglesPause()
+        {
+            // Arrange
+            _server = new SimulationWebServer(_simulation, TestPort);
+            _server.Start();
+            Thread.Sleep(200);
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
+            // Act
+            var getResponse = await client.GetAsync($"http://localhost:{TestPort}/api/pause");
+            var firstPost = await client.PostAsync($"http://localhost:{TestPort}/api/pause", null);
+            bool pausedAfterFirst = _simulation.TickManager.IsPaused;
+            var secondPost = await client.PostAsync($"http://localhost:{TestPort}/api/pause", null);
+
+            // Assert
+            Assert.Equal(HttpStatusCode.MethodNotAllowed, getResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, firstPost.StatusCode);
+            Assert.True(pausedAfterFirst);
+            using var document = JsonDocument.Parse(await firstPost.Content.ReadAsStringAsync());
+            Assert.True(document.RootElement.GetProperty("isPaused").GetBoolean());
+            Assert.Equal(HttpStatusCode.OK, secondPost.StatusCode);
+            Assert.False(_simulation.TickManager.IsPaused);
         }
 
         [Fact]

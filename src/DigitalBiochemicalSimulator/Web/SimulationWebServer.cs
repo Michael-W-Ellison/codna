@@ -22,6 +22,12 @@ namespace DigitalBiochemicalSimulator.Web
         private Thread? _serverThread;
         private bool _disposed;
 
+        // camelCase property names, matching what wwwroot/index.html reads
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
         public int Port { get; private set; }
         public bool IsRunning => _isRunning;
 
@@ -29,10 +35,28 @@ namespace DigitalBiochemicalSimulator.Web
         {
             _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
             Port = port;
-            _webRoot = webRoot ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            _webRoot = Path.GetFullPath(webRoot ?? FindDefaultWebRoot());
             _listener = new HttpListener();
             _listener.Prefixes.Add($"http://localhost:{port}/");
             _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        }
+
+        /// <summary>
+        /// The directory static files are served from
+        /// </summary>
+        public string WebRoot => _webRoot;
+
+        /// <summary>
+        /// Finds the wwwroot directory: next to the executable (where the build copies it),
+        /// otherwise in the current directory
+        /// </summary>
+        private static string FindDefaultWebRoot()
+        {
+            var besideExecutable = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+            if (Directory.Exists(besideExecutable))
+                return besideExecutable;
+
+            return Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
         }
 
         /// <summary>
@@ -175,6 +199,18 @@ namespace DigitalBiochemicalSimulator.Web
                     jsonResponse = GetEvolution();
                     break;
 
+                case "/api/pause":
+                    if (request.HttpMethod != "POST")
+                    {
+                        SendJSONResponse(JsonSerializer.Serialize(new { error = "Use POST to toggle pause" }, JsonOptions), response, statusCode: 405);
+                        return;
+                    }
+
+                    // Toggle pause, then report the new status
+                    _simulation.SetPaused(!_simulation.TickManager.IsPaused);
+                    jsonResponse = GetStatus();
+                    break;
+
                 case "/api/export/json":
                     jsonResponse = _simulation?.ExportAnalyticsToJSON() ?? "{}";
                     break;
@@ -185,7 +221,7 @@ namespace DigitalBiochemicalSimulator.Web
                     return;
 
                 default:
-                    SendJSONResponse(JsonSerializer.Serialize(new { error = "Endpoint not found" }), response, statusCode: 404);
+                    SendJSONResponse(JsonSerializer.Serialize(new { error = "Endpoint not found" }, JsonOptions), response, statusCode: 404);
                     return;
             }
 
@@ -223,7 +259,7 @@ namespace DigitalBiochemicalSimulator.Web
                 }
             };
 
-            return JsonSerializer.Serialize(data);
+            return JsonSerializer.Serialize(data, JsonOptions);
         }
 
         /// <summary>
@@ -232,10 +268,10 @@ namespace DigitalBiochemicalSimulator.Web
         private string GetStatistics()
         {
             if (_simulation == null)
-                return JsonSerializer.Serialize(new { });
+                return JsonSerializer.Serialize(new { }, JsonOptions);
 
             var stats = _simulation.GetStatistics();
-            return JsonSerializer.Serialize(stats);
+            return JsonSerializer.Serialize(stats, JsonOptions);
         }
 
         /// <summary>
@@ -244,10 +280,10 @@ namespace DigitalBiochemicalSimulator.Web
         private string GetDashboard()
         {
             if (_simulation == null)
-                return JsonSerializer.Serialize(new { });
+                return JsonSerializer.Serialize(new { }, JsonOptions);
 
             var dashboard = _simulation.GetDashboardData();
-            return JsonSerializer.Serialize(dashboard);
+            return JsonSerializer.Serialize(dashboard, JsonOptions);
         }
 
         /// <summary>
@@ -256,7 +292,7 @@ namespace DigitalBiochemicalSimulator.Web
         private string GetGridData()
         {
             if (_simulation?.Grid == null)
-                return JsonSerializer.Serialize(new { cells = new object[0] });
+                return JsonSerializer.Serialize(new { cells = new object[0] }, JsonOptions);
 
             var activeCells = _simulation.Grid.ActiveCells;
             var cellData = new System.Collections.Generic.List<object>();
@@ -284,7 +320,7 @@ namespace DigitalBiochemicalSimulator.Web
                 }
             }
 
-            return JsonSerializer.Serialize(new { cells = cellData });
+            return JsonSerializer.Serialize(new { cells = cellData }, JsonOptions);
         }
 
         /// <summary>
@@ -293,7 +329,7 @@ namespace DigitalBiochemicalSimulator.Web
         private string GetChains()
         {
             if (_simulation?.ChainRegistry == null)
-                return JsonSerializer.Serialize(new { chains = new object[0] });
+                return JsonSerializer.Serialize(new { chains = new object[0] }, JsonOptions);
 
             var chains = _simulation.ChainRegistry.GetAllChains();
             var chainData = chains.Select(c => new
@@ -310,7 +346,7 @@ namespace DigitalBiochemicalSimulator.Web
                 })
             });
 
-            return JsonSerializer.Serialize(new { chains = chainData });
+            return JsonSerializer.Serialize(new { chains = chainData }, JsonOptions);
         }
 
         /// <summary>
@@ -339,7 +375,7 @@ namespace DigitalBiochemicalSimulator.Web
                 commonPatterns = patterns
             };
 
-            return JsonSerializer.Serialize(data);
+            return JsonSerializer.Serialize(data, JsonOptions);
         }
 
         /// <summary>
@@ -350,7 +386,7 @@ namespace DigitalBiochemicalSimulator.Web
             if (json == null)
             {
                 statusCode = 500;
-                json = JsonSerializer.Serialize(new { error = "Internal server error" });
+                json = JsonSerializer.Serialize(new { error = "Internal server error" }, JsonOptions);
             }
 
             var buffer = Encoding.UTF8.GetBytes(json);
@@ -383,9 +419,11 @@ namespace DigitalBiochemicalSimulator.Web
             if (path == "/")
                 path = "/index.html";
 
-            var filePath = Path.Combine(_webRoot, path.TrimStart('/'));
+            var filePath = Path.GetFullPath(Path.Combine(_webRoot, path.TrimStart('/')));
+            bool insideWebRoot = filePath.StartsWith(_webRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                StringComparison.Ordinal);
 
-            if (!File.Exists(filePath))
+            if (!insideWebRoot || !File.Exists(filePath))
             {
                 response.StatusCode = 404;
                 var buffer = Encoding.UTF8.GetBytes("<h1>404 - Not Found</h1>");

@@ -16,6 +16,14 @@
     <InternalsVisibleTo Include="DigitalBiochemicalSimulator.Tests" />
   </ItemGroup>
 
+  <!-- Web interface files, copied next to the executable (build and publish output) -->
+  <ItemGroup>
+    <Content Include="..\..\wwwroot\**\*" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Spectre.Console" Version="0.47.0" />
