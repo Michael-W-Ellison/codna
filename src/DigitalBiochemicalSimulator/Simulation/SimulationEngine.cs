@@ -221,6 +221,13 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
+                    // Vents stop adding tokens once the population reaches MaxActiveTokens
+                    if (ActiveTokens.Count >= Config.MaxActiveTokens)
+                    {
+                        TokenPool.ReleaseToken(token);
+                        continue;
+                    }
+
                     Grid.AddToken(token);
                     ActiveTokens.Add(token);
                     TotalTokensGenerated++;

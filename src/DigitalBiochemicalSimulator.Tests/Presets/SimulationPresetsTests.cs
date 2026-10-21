@@ -281,8 +281,8 @@ namespace DigitalBiochemicalSimulator.Tests.Presets
             // Act
             var config = SimulationPresets.HighPressure();
 
-            // Assert - Should have tall grid for high altitude pressure
-            Assert.True(config.GridHeight >= 100);
+            // Assert - Should have tall grid for high altitude pressure (altitude is the Z axis)
+            Assert.True(config.GridDepth >= 100);
         }
 
         [Fact]

@@ -8,6 +8,8 @@ using DigitalBiochemicalSimulator.Simulation;
 using DigitalBiochemicalSimulator.Visualization;
 using DigitalBiochemicalSimulator.Web;
 using DigitalBiochemicalSimulator.Grammar;
+using PresetCatalog = DigitalBiochemicalSimulator.Presets.PresetCatalog;
+using PresetInfo = DigitalBiochemicalSimulator.Presets.PresetInfo;
 using Grid = DigitalBiochemicalSimulator.DataStructures.Grid;
 
 namespace DigitalBiochemicalSimulator
@@ -241,27 +243,16 @@ namespace DigitalBiochemicalSimulator
         {
             Console.WriteLine("\n--- Full Simulation ---\n");
 
-            Console.WriteLine("Select preset:");
-            Console.WriteLine("1. Minimal (10x10x10, fast)");
-            Console.WriteLine("2. Standard (50x50x50, balanced)");
-            Console.WriteLine("3. Expression Evolution (optimized for math)");
-            Console.WriteLine("4. Harsh Selection (strong evolutionary pressure)");
-            Console.Write("\nChoice: ");
-
-            SimulationConfig config = Console.ReadLine() switch
-            {
-                "1" => SimulationPresets.Minimal,
-                "2" => SimulationPresets.Standard,
-                "3" => SimulationPresets.ExpressionEvolution,
-                "4" => SimulationPresets.HarshSelection,
-                _ => SimulationPresets.Standard
-            };
+            var preset = SelectPreset("Select preset:");
+            var config = preset.Create();
 
             Console.WriteLine($"\nStarting simulation with {config.GridWidth}x{config.GridHeight}x{config.GridDepth} grid...");
             Console.WriteLine("Press 'P' to pause/unpause, 'Q' to quit, 'S' for stats");
             Console.WriteLine();
 
-            var simulation = new SimulationEngine(config);
+            Console.WriteLine($"Preset: {preset.Name}");
+
+            using var simulation = new IntegratedSimulationEngine(config);
             simulation.Start();
 
             bool running = true;
@@ -337,17 +328,7 @@ namespace DigitalBiochemicalSimulator
             }
             else
             {
-                config = AnsiConsole.Prompt(
-                    new SelectionPrompt<SimulationConfig>()
-                        .Title("[green]Select preset configuration:[/]")
-                        .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
-                        .AddChoices(new[] {
-                            SimulationPresets.Minimal,
-                            SimulationPresets.Standard,
-                            SimulationPresets.ExpressionEvolution,
-                            SimulationPresets.HarshSelection,
-                            Presets.SimulationPresets.RapidEvolution()
-                        }));
+                config = SelectPreset("Select preset configuration:").Create();
             }
 
             AnsiConsole.Clear();
@@ -498,21 +479,12 @@ namespace DigitalBiochemicalSimulator
             AnsiConsole.MarkupLine("[bold cyan]Custom Configuration[/]\n");
 
             // Start with a base preset
-            var basePreset = AnsiConsole.Prompt(
-                new SelectionPrompt<SimulationConfig>()
-                    .Title("[green]Start with preset as base:[/]")
-                    .UseConverter(c => GetPresetName(c))
-                    .AddChoices(new[] {
-                        SimulationPresets.Minimal,
-                        SimulationPresets.Standard,
-                        SimulationPresets.ExpressionEvolution,
-                        SimulationPresets.HarshSelection,
-                        Presets.SimulationPresets.RapidEvolution()
-                    }));
+            var basePresetInfo = SelectPreset("Start with preset as base:");
+            var basePreset = basePresetInfo.Create();
 
             var config = basePreset.Clone();
 
-            AnsiConsole.MarkupLine($"\n[yellow]Customizing configuration based on: {GetPresetName(basePreset)}[/]\n");
+            AnsiConsole.MarkupLine($"\n[yellow]Customizing configuration based on: {Markup.Escape(basePresetInfo.Name)}[/]\n");
 
             // Configuration categories to customize
             var categories = AnsiConsole.Prompt(
@@ -880,14 +852,21 @@ namespace DigitalBiochemicalSimulator
         /// <summary>
         /// Gets a friendly name for a preset configuration
         /// </summary>
-        static string GetPresetName(SimulationConfig config)
+        /// <summary>
+        /// Prompts for one of the presets in the preset catalog
+        /// </summary>
+        static PresetInfo SelectPreset(string title)
         {
-            if (config.GridWidth == 10) return "Minimal";
-            if (config.GridWidth == 50) return "Standard";
-            if (config.DamageExponent == 2.5f) return "Expression Evolution";
-            if (config.DamageExponent == 4.0f) return "Harsh Selection";
-            if (config.VentEmissionRate == 2) return "Rapid Evolution";
-            return "Custom";
+            return AnsiConsole.Prompt(
+                new SelectionPrompt<PresetInfo>()
+                    .Title($"[green]{Markup.Escape(title)}[/]")
+                    .PageSize(16)
+                    .UseConverter(p =>
+                    {
+                        var c = p.Create();
+                        return Markup.Escape($"{p.Name} ({c.GridWidth}x{c.GridHeight}x{c.GridDepth}) - {p.Description}");
+                    })
+                    .AddChoices(PresetCatalog.All));
         }
 
         /// <summary>
@@ -914,17 +893,7 @@ namespace DigitalBiochemicalSimulator
             }
             else
             {
-                config = AnsiConsole.Prompt(
-                    new SelectionPrompt<SimulationConfig>()
-                        .Title("[green]Select preset configuration:[/]")
-                        .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
-                        .AddChoices(new[] {
-                            SimulationPresets.Minimal,
-                            SimulationPresets.Standard,
-                            SimulationPresets.ExpressionEvolution,
-                            SimulationPresets.HarshSelection,
-                            Presets.SimulationPresets.RapidEvolution()
-                        }));
+                config = SelectPreset("Select preset configuration:").Create();
             }
 
             var port = AnsiConsole.Ask<int>("[cyan]Web server port:[/]", 8080);

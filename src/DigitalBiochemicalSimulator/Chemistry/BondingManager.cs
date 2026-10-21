@@ -60,28 +60,17 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (bondStrength < _config.MinBondStrength)
                 return false;
 
-            // Step 3: Calculate energy cost
-            int energyCost = _strengthCalculator.CalculateBondEnergyCost(token1, token2);
-            int totalEnergy = token1.Energy + token2.Energy;
-
-            if (totalEnergy < energyCost)
-                return false; // Not enough energy
-
-            // Step 4: Determine bond type
+            // Step 3: Determine bond type
             BondType bondType = _strengthCalculator.DetermineBondType(token1, token2);
 
-            // Step 5: Create the bond
-            CreateBond(token1, token2, bondType, bondStrength, energyCost);
+            // Step 4: Create the bond (bonding needs no energy; design spec section 3.4.3)
+            CreateBond(token1, token2, bondType, bondStrength);
 
-            // Step 6: Update or create chains
+            // Step 5: Update or create chains
             UpdateChains(token1, token2, bondType, bondStrength, currentTick);
 
-            // Step 7: Generate energy from bond formation (exothermic)
-            int energyRelease = _strengthCalculator.CalculateBondEnergyRelease(token1, token2);
-            if (energyRelease > 0)
-            {
-                DistributeEnergyToChain(token1, energyRelease);
-            }
+            // Step 6: Generate bonding energy: (chain length - 1) * EnergyPerBond
+            DistributeEnergyToChain(token1, _config.EnergyPerBond);
 
             return true;
         }
@@ -89,18 +78,11 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Creates a bond between two tokens
         /// </summary>
-        private void CreateBond(Token token1, Token token2, BondType bondType, float strength, int energyCost)
+        private void CreateBond(Token token1, Token token2, BondType bondType, float strength)
         {
             // Add tokens to each other's bonded lists
             token1.BondedTokens.Add(token2);
             token2.BondedTokens.Add(token1);
-
-            // Deduct energy cost (split between both tokens)
-            int cost1 = energyCost / 2;
-            int cost2 = energyCost - cost1;
-
-            token1.Energy = Math.Max(0, token1.Energy - cost1);
-            token2.Energy = Math.Max(0, token2.Energy - cost2);
 
             // Update bond sites (if available)
             UpdateBondSites(token1, token2, bondType);
@@ -354,6 +336,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
             int totalEnergy = (chain.Length - 1) * energyPerBond;
             int energyPerToken = totalEnergy / chain.Length;
+            int remainder = totalEnergy % chain.Length; // given one each to the first tokens
 
             // Distribute energy to all tokens in chain
             var visited = new HashSet<long>();
@@ -367,7 +350,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
                     continue;
 
                 visited.Add(current.Id);
-                current.Energy += energyPerToken;
+                current.Energy += energyPerToken + (remainder-- > 0 ? 1 : 0);
 
                 foreach (var bonded in current.BondedTokens)
                 {

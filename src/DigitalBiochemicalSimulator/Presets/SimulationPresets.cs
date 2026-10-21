@@ -54,7 +54,13 @@ namespace DigitalBiochemicalSimulator.Presets
                 TokenGenerationRate = 10,
                 GravityStrength = 0.5f,
                 CellCapacity = 20,
-                TicksPerSecond = 60
+                TicksPerSecond = 60,
+                InitialTokenEnergy = 80,   // High energy environment
+                MutationRange = 30,        // Mutation over the whole height
+                MutationRate = 3,          // High mutation rate
+                BaseDamageRate = 0.02f,
+                ValidationFrequency = 2,   // Rapid destruction of invalid chains
+                StabilityThreshold = 5
             };
         }
 
@@ -82,7 +88,11 @@ namespace DigitalBiochemicalSimulator.Presets
                 TokenGenerationRate = 2,
                 GravityStrength = 1.5f,
                 CellCapacity = 8,
-                TicksPerSecond = 60
+                TicksPerSecond = 60,
+                InitialTokenEnergy = 30,   // Low energy input (stays near the bottom)
+                BaseDamageRate = 0.005f,   // Little damage, so chains live long
+                StabilityThreshold = 30,   // Chains are validated only once they have settled
+                MinBondStrength = 0.4f     // Only strong bonds form
             };
         }
 
@@ -104,13 +114,17 @@ namespace DigitalBiochemicalSimulator.Presets
         /// </summary>
         public static SimulationConfig HighPressure()
         {
-            return new SimulationConfig(40, 100, 40)
+            return new SimulationConfig(40, 40, 100) // Tall: altitude is the Z axis (depth)
             {
                 MaxTokens = 500,
                 TokenGenerationRate = 5,
                 GravityStrength = 2.0f,
                 CellCapacity = 10,
-                TicksPerSecond = 60
+                TicksPerSecond = 60,
+                MutationRange = 100,       // Damage gradient over the full height
+                BaseDamageRate = 0.05f,
+                DamageExponent = 3.0f,     // Extreme altitude damage gradient
+                CriticalDamageThreshold = 0.6f
             };
         }
 
@@ -132,13 +146,15 @@ namespace DigitalBiochemicalSimulator.Presets
         /// </summary>
         public static SimulationConfig SparseExploration()
         {
-            return new SimulationConfig(100, 50, 100)
+            return new SimulationConfig(100, 100, 50) // Wide and shallow: altitude is the Z axis (depth)
             {
                 MaxTokens = 1000,
                 TokenGenerationRate = 3,
                 GravityStrength = 0.8f,
                 CellCapacity = 5,
-                TicksPerSecond = 60
+                TicksPerSecond = 60,
+                NumberOfVents = 4,                          // Separate evolution pockets
+                VentDistribution = VentDistribution.Distributed
             };
         }
 
@@ -195,7 +211,12 @@ namespace DigitalBiochemicalSimulator.Presets
                 TokenGenerationRate = 20,
                 GravityStrength = 0.3f,
                 CellCapacity = 30,
-                TicksPerSecond = 60
+                TicksPerSecond = 60,
+                InitialTokenEnergy = 100,  // Very high energy input
+                NumberOfVents = 3,
+                VentDistribution = VentDistribution.Random,
+                MutationRange = 40,
+                MutationRate = 2
             };
         }
 
@@ -217,13 +238,17 @@ namespace DigitalBiochemicalSimulator.Presets
         /// </summary>
         public static SimulationConfig CompetitiveSelection()
         {
-            return new SimulationConfig(50, 120, 50)
+            return new SimulationConfig(50, 50, 120) // Tall: altitude is the Z axis (depth)
             {
                 MaxTokens = 600,
                 TokenGenerationRate = 8,
                 GravityStrength = 2.5f,
                 CellCapacity = 10,
-                TicksPerSecond = 60
+                TicksPerSecond = 60,
+                MaxChains = 50,            // Competition for a limited number of chains
+                MutationRange = 120,
+                BaseDamageRate = 0.03f,    // High damage pressure
+                DamageExponent = 2.5f
             };
         }
 
@@ -251,7 +276,11 @@ namespace DigitalBiochemicalSimulator.Presets
                 TokenGenerationRate = 5,
                 GravityStrength = 1.0f,
                 CellCapacity = 25,
-                TicksPerSecond = 60
+                TicksPerSecond = 30,       // Bonding across cells costs more per tick
+                BondingRange = 1.5f,       // Tokens in neighboring cells can bond (clustering)
+                MinBondStrength = 0.2f,    // Cooperative bonding favored
+                BaseDamageRate = 0.002f,   // Gentle evolutionary landscape
+                MaxChains = 400
             };
         }
 
@@ -369,7 +398,7 @@ namespace DigitalBiochemicalSimulator.Presets
                 "MicroEvolution" => "120+ TPS",
                 "ChaoticDynamics" => "40-70 TPS",
                 "CompetitiveSelection" => "50-80 TPS",
-                "CooperativeBuilding" => "60-90 TPS",
+                "CooperativeBuilding" => "30-50 TPS",
                 "MinimalistSimulation" => "150+ TPS",
                 "MaximumComplexity" => "10-30 TPS",
                 _ => "Unknown"

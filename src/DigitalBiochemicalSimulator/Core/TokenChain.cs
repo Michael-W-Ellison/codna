@@ -523,8 +523,11 @@ namespace DigitalBiochemicalSimulator.Core
 
             if (operatorIndex == -1)
             {
-                // No operator found, might be a single value with parentheses
-                return BuildExpressionTree(start, end);
+                // No operator found: a parenthesized expression, otherwise not an expression
+                if (Tokens[start].Type == TokenType.PAREN_OPEN && Tokens[end].Type == TokenType.PAREN_CLOSE)
+                    return BuildExpressionTree(start + 1, end - 1);
+
+                return null;
             }
 
             var operatorToken = Tokens[operatorIndex];

@@ -298,6 +298,13 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
+                    // Vents stop adding tokens once the population reaches MaxActiveTokens
+                    if (ActiveTokens.Count >= Config.MaxActiveTokens)
+                    {
+                        TokenPool.ReleaseToken(token);
+                        continue;
+                    }
+
                     Grid.AddToken(token);
                     ActiveTokens.Add(token);
                     TotalTokensGenerated++;
@@ -358,33 +365,31 @@ namespace DigitalBiochemicalSimulator.Simulation
         private void UpdateChains(long currentTick)
         {
             // Track the chains formed by the bonding manager
-            SyncChainRegistry();
+            SyncChainRegistry(currentTick);
+            var trackedIds = RegisteredChainIds();
 
-            // Update stability scores for all chains (removes extremely unstable chains)
+            // Update stability scores and stable status
             ChainRegistry.UpdateAllStabilities(currentTick);
-
-            // Prune stale chains periodically (every 100 ticks)
-            if (currentTick % 100 == 0)
-            {
-                ChainRegistry.PruneStaleChains(currentTick, maxAge: 1000);
-            }
 
             // Validate chains every ValidationFrequency ticks
             if (Config.ValidationFrequency > 0 && currentTick % Config.ValidationFrequency == 0)
             {
                 ValidateChains(currentTick);
+                trackedIds = RecordChainDeaths(trackedIds, "Invalid", currentTick);
             }
 
             EnforceChainLimit();
+            RecordChainDeaths(trackedIds, "ChainLimit", currentTick);
 
-            // Chains the registry dropped (unstable, stale, invalid, or over the limit) break apart
+            // Chains the registry dropped (invalid or over the limit) break apart
             DissolveUntrackedChains(currentTick);
         }
 
         /// <summary>
-        /// Makes the chain registry match the bonding manager's active chains
+        /// Makes the chain registry match the bonding manager's active chains, and records
+        /// chain births and deaths in the evolution tracker
         /// </summary>
-        private void SyncChainRegistry()
+        private void SyncChainRegistry(long currentTick)
         {
             var activeChains = BondingManager.GetActiveChains();
             var activeIds = new HashSet<long>(activeChains.Select(c => c.Id));
@@ -392,14 +397,43 @@ namespace DigitalBiochemicalSimulator.Simulation
             foreach (var chain in ChainRegistry.GetAllChains())
             {
                 if (!activeIds.Contains(chain.Id))
+                {
+                    // Merged into another chain, split, or lost its bonds
                     ChainRegistry.RemoveChain(chain.Id);
+                    Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, "Restructured");
+                }
             }
 
             foreach (var chain in activeChains)
             {
                 if (ChainRegistry.GetChain(chain.Id) != chain)
+                {
                     ChainRegistry.RegisterChain(chain);
+                    Analytics.Evolution.RecordChainFormation(chain, currentTick);
+                }
             }
+        }
+
+        private HashSet<long> RegisteredChainIds()
+        {
+            return new HashSet<long>(ChainRegistry.GetAllChains().Select(c => c.Id));
+        }
+
+        /// <summary>
+        /// Records the end of every chain in trackedIds that is no longer registered;
+        /// returns the IDs still registered
+        /// </summary>
+        private HashSet<long> RecordChainDeaths(HashSet<long> trackedIds, string reason, long currentTick)
+        {
+            var remaining = RegisteredChainIds();
+
+            foreach (var id in trackedIds)
+            {
+                if (!remaining.Contains(id))
+                    Analytics.Evolution.RecordChainDestruction(id, currentTick, reason);
+            }
+
+            return remaining;
         }
 
         /// <summary>
@@ -580,6 +614,10 @@ namespace DigitalBiochemicalSimulator.Simulation
 
             // Reset systems
             TickManager.Reset();
+            foreach (var chain in BondingManager.GetActiveChains())
+            {
+                BondingManager.RemoveChain(chain);
+            }
             ChainRegistry.Clear();
             Statistics.ClearHistory();
             Analytics.Clear();

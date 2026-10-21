@@ -88,7 +88,10 @@ namespace DigitalBiochemicalSimulator.Physics
             }
 
             // Attempt to move
+            var oldPosition = token.Position;
             bool moved = _grid.MoveToken(token, newPosition);
+            if (moved)
+                MoveChainMembers(token, token.Position - oldPosition);
 
             if (moved)
             {
@@ -99,6 +102,36 @@ namespace DigitalBiochemicalSimulator.Physics
                 // Couldn't move (cell full), lose some energy
                 token.Energy -= _config.EnvironmentViscosity;
                 token.Velocity = Vector3Int.Zero;
+            }
+        }
+
+        /// <summary>
+        /// Moves the other tokens bonded to a chain head by the same offset as the head,
+        /// so a chain moves as one unit
+        /// </summary>
+        private void MoveChainMembers(Token head, Vector3Int offset)
+        {
+            if (!head.IsInChain || offset == Vector3Int.Zero)
+                return;
+
+            var visited = new HashSet<long> { head.Id };
+            var queue = new Queue<Token>(head.BondedTokens);
+
+            while (queue.Count > 0)
+            {
+                var member = queue.Dequeue();
+                if (!visited.Add(member.Id))
+                    continue;
+
+                var target = member.Position + offset;
+                if (_grid.IsValidPosition(target))
+                    _grid.MoveToken(member, target);
+
+                foreach (var bonded in member.BondedTokens)
+                {
+                    if (!visited.Contains(bonded.Id))
+                        queue.Enqueue(bonded);
+                }
             }
         }
 
@@ -144,7 +177,10 @@ namespace DigitalBiochemicalSimulator.Physics
                 newPosition = new Vector3Int(newPosition.X, newPosition.Y, 0);
 
             // Attempt to move
+            var oldPosition = token.Position;
             bool moved = _grid.MoveToken(token, newPosition);
+            if (moved)
+                MoveChainMembers(token, token.Position - oldPosition);
 
             if (moved)
             {
