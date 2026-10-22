@@ -11,7 +11,12 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// Template-directed replication: a chain that has passed validation assembles a copy of
     /// itself from free (unbonded) tokens nearby. The copy matches the parent's token types in
     /// order; its values come from the tokens it is built from. With probability
-    /// ReplicationErrorRate one position takes a token of a different type (a copying error).
+    /// ReplicationErrorRate a position takes a token of a different type (a copying error).
+    ///
+    /// A copy is built over several ticks: each tick it reserves free tokens of the types it still
+    /// needs from within ReplicationRange cells of the parent's tokens. Reserved tokens cannot bond
+    /// or be recycled. When every position is filled the copy is bonded in order; if it is not
+    /// complete within ReplicationTimeout ticks, or the parent chain is gone, its tokens are released.
     /// </summary>
     public class ChainReplicator
     {
@@ -19,6 +24,8 @@ namespace DigitalBiochemicalSimulator.Simulation
         private readonly Grid _grid;
         private readonly SimulationConfig _config;
         private readonly Random _random;
+        private readonly List<CopyInProgress> _copies = new List<CopyInProgress>();
+        private long _nextCopyId = 1;
 
         public ChainReplicator(BondingManager bondingManager, Grid grid, SimulationConfig config, Random? random = null)
         {
@@ -29,51 +36,139 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Attempts to build a copy of the parent chain from free tokens within ReplicationRange
-        /// cells of any of its tokens. Returns the new chain, or null if the needed tokens are not
-        /// available or the copy could not be bonded (no bonds are left behind on failure).
+        /// Number of copies being built
+        /// </summary>
+        public int CopiesInProgress => _copies.Count;
+
+        /// <summary>
+        /// Whether the chain is already building a copy
+        /// </summary>
+        public bool IsCopying(TokenChain parent) => _copies.Any(c => c.Parent == parent);
+
+        /// <summary>
+        /// Starts building a copy of the parent chain and gathers whatever tokens are available now.
+        /// Returns false if the chain is too short or already building a copy.
+        /// </summary>
+        public bool StartCopy(TokenChain parent)
+        {
+            if (parent.Tokens.Count < 2 || IsCopying(parent))
+                return false;
+
+            var copy = new CopyInProgress(_nextCopyId++, parent);
+            _copies.Add(copy);
+            Gather(copy);
+            return true;
+        }
+
+        /// <summary>
+        /// Advances every copy in progress: gathers tokens, bonds copies whose positions are all
+        /// filled, and abandons copies that timed out, lost their parent, or lost a reserved token.
+        /// Returns the completed copies with their parent chains.
+        /// </summary>
+        public List<(TokenChain Copy, TokenChain Parent)> Advance(long currentTick, Func<TokenChain, bool> parentIsAlive)
+        {
+            var completed = new List<(TokenChain Copy, TokenChain Parent)>();
+
+            foreach (var copy in _copies.ToList())
+            {
+                copy.Age++;
+
+                if (!parentIsAlive(copy.Parent) || copy.Age > Math.Max(1, _config.ReplicationTimeout) || !copy.ReservationsIntact())
+                {
+                    Abandon(copy);
+                    continue;
+                }
+
+                Gather(copy);
+                if (!copy.IsFilled)
+                    continue;
+
+                var chain = Assemble(copy, currentTick);
+                _copies.Remove(copy);
+                if (chain != null)
+                    completed.Add((chain, copy.Parent));
+            }
+
+            return completed;
+        }
+
+        /// <summary>
+        /// Releases the tokens of every copy in progress
+        /// </summary>
+        public void CancelAll()
+        {
+            foreach (var copy in _copies.ToList())
+                Abandon(copy);
+        }
+
+        /// <summary>
+        /// Attempts to build a complete copy immediately from the free tokens available now.
+        /// Returns the new chain, or null if the needed tokens are not available or the copy could
+        /// not be bonded (nothing is left reserved or bonded on failure).
         /// </summary>
         public TokenChain? TryReplicate(TokenChain parent, long currentTick)
         {
-            var template = parent.Tokens;
-            if (template.Count < 2)
+            if (!StartCopy(parent))
                 return null;
 
-            var available = FindFreeTokens(parent);
-            var byType = available
-                .GroupBy(t => t.Type)
-                .ToDictionary(g => g.Key, g => g.ToList());
+            var copy = _copies[_copies.Count - 1];
+            _copies.Remove(copy);
 
-            // Pick one free token per template position
-            var selected = new List<Token>(template.Count);
-            foreach (var templateToken in template)
+            if (!copy.IsFilled)
             {
-                Token? pick;
-                if (_random.NextDouble() < _config.ReplicationErrorRate)
-                    pick = TakeRandom(available.Where(t => t.Type != templateToken.Type && !selected.Contains(t)).ToList());
-                else
-                    pick = byType.TryGetValue(templateToken.Type, out var matches)
-                        ? TakeRandom(matches.Where(t => !selected.Contains(t)).ToList())
-                        : null;
-
-                if (pick == null)
-                    return null;
-
-                selected.Add(pick);
+                copy.Release();
+                return null;
             }
 
-            // Bond the copy in order, undoing it if any bond cannot form
-            for (int i = 1; i < selected.Count; i++)
+            return Assemble(copy, currentTick);
+        }
+
+        private void Gather(CopyInProgress copy)
+        {
+            var available = FindFreeTokens(copy.Parent);
+
+            for (int i = 0; i < copy.Slots.Length; i++)
             {
-                if (!_bondingManager.AttemptBond(selected[i - 1], selected[i], currentTick))
+                if (copy.Slots[i] != null)
+                    continue;
+
+                var needed = copy.TemplateTypes[i];
+                bool copyingError = _random.NextDouble() < _config.ReplicationErrorRate;
+                var candidates = available.Where(t => !t.IsReserved && (copyingError ? t.Type != needed : t.Type == needed)).ToList();
+                if (candidates.Count == 0)
+                    continue;
+
+                var pick = candidates[_random.Next(candidates.Count)];
+                pick.ReservedBy = copy.Id;
+                copy.Slots[i] = pick;
+            }
+        }
+
+        /// <summary>
+        /// Bonds a filled copy in order; on failure undoes the bonds. Releases the reservations either way.
+        /// </summary>
+        private TokenChain? Assemble(CopyInProgress copy, long currentTick)
+        {
+            var tokens = copy.Slots.Select(t => t!).ToList();
+            copy.Release();
+
+            for (int i = 1; i < tokens.Count; i++)
+            {
+                if (!_bondingManager.AttemptBond(tokens[i - 1], tokens[i], currentTick))
                 {
                     for (int j = 1; j < i; j++)
-                        _bondingManager.BreakBond(selected[j - 1], selected[j], currentTick);
+                        _bondingManager.BreakBond(tokens[j - 1], tokens[j], currentTick);
                     return null;
                 }
             }
 
-            return _bondingManager.GetTokenChain(selected[0]);
+            return _bondingManager.GetTokenChain(tokens[0]);
+        }
+
+        private void Abandon(CopyInProgress copy)
+        {
+            copy.Release();
+            _copies.Remove(copy);
         }
 
         /// <summary>
@@ -96,9 +191,42 @@ namespace DigitalBiochemicalSimulator.Simulation
             return found.ToList();
         }
 
-        private Token? TakeRandom(List<Token> tokens)
+        /// <summary>
+        /// A copy being assembled: the parent's token types (fixed when the copy starts) and the
+        /// tokens reserved for each position so far
+        /// </summary>
+        private class CopyInProgress
         {
-            return tokens.Count == 0 ? null : tokens[_random.Next(tokens.Count)];
+            public long Id { get; }
+            public TokenChain Parent { get; }
+            public TokenType[] TemplateTypes { get; }
+            public Token?[] Slots { get; }
+            public int Age { get; set; }
+
+            public CopyInProgress(long id, TokenChain parent)
+            {
+                Id = id;
+                Parent = parent;
+                TemplateTypes = parent.Tokens.Select(t => t.Type).ToArray();
+                Slots = new Token?[TemplateTypes.Length];
+            }
+
+            public bool IsFilled => Slots.All(t => t != null);
+
+            /// <summary>
+            /// False if a reserved token was removed from the simulation (its reservation was cleared)
+            /// or deactivated
+            /// </summary>
+            public bool ReservationsIntact() => Slots.All(t => t == null || (t.ReservedBy == Id && t.IsActive));
+
+            public void Release()
+            {
+                foreach (var token in Slots)
+                {
+                    if (token != null && token.ReservedBy == Id)
+                        token.ReservedBy = 0;
+                }
+            }
         }
     }
 }

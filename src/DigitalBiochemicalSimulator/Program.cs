@@ -844,6 +844,16 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
                         .Validate(v => v >= 0.0f && v <= 1.0f));
 
+                config.ReplicationTimeout = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Replication Timeout (ticks a copy may spend gathering tokens):[/]")
+                        .DefaultValue(config.ReplicationTimeout)
+                        .ValidationErrorMessage("[red]Must be between 1 and 10000[/]")
+                        .Validate(v => v >= 1 && v <= 10000));
+
+                config.FitnessWeightedDecay = AnsiConsole.Confirm(
+                    "[cyan]Fitness-weighted decay (longer, more complete chains last longer)?[/]",
+                    config.FitnessWeightedDecay);
+
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Replication configured");
             }
 

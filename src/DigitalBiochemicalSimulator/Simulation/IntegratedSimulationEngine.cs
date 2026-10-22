@@ -325,14 +325,14 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Removes the oldest token that is not bonded, preferring resting tokens (no energy).
-        /// Returns false when every token is bonded.
+        /// Removes the oldest token that is not bonded or reserved, preferring resting tokens (no energy).
+        /// Returns false when every token is bonded or reserved for a copy.
         /// </summary>
         private bool RecycleOldestFreeToken()
         {
             // ActiveTokens is in the order tokens were generated, so the first match is the oldest
-            var token = ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0 && t.Energy == 0)
-                        ?? ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0);
+            var token = ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0 && !t.IsReserved && t.Energy == 0)
+                        ?? ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0 && !t.IsReserved);
             if (token == null)
                 return false;
 
@@ -458,6 +458,16 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
+        /// Chance per tick that a chain decays
+        /// </summary>
+        internal static double DecayProbability(SimulationConfig config, double fitness, double averageFitness)
+        {
+            return config.FitnessWeightedDecay && fitness > 0
+                ? Math.Min(1.0, config.ChainDecayRate * averageFitness / fitness)
+                : config.ChainDecayRate;
+        }
+
+        /// <summary>
         /// Chance per tick that an eligible chain replicates
         /// </summary>
         internal static double ReplicationProbability(SimulationConfig config, double fitness, double averageFitness)
@@ -468,17 +478,27 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Each chain breaks down with probability ChainDecayRate; its lineage ends as Decayed and its
-        /// bonds are broken by the dissolve step, returning its tokens to the pool
+        /// Each chain breaks down with probability ChainDecayRate, or, with FitnessWeightedDecay,
+        /// ChainDecayRate * average fitness / its fitness (capped at 1), so fitter chains last longer.
+        /// Its lineage ends as Decayed and its bonds are broken by the dissolve step, returning its
+        /// tokens to the pool.
         /// </summary>
         private void DecayChains(long currentTick)
         {
             if (Config.ChainDecayRate <= 0.0f)
                 return;
 
-            foreach (var chain in ChainRegistry.GetAllChains())
+            var chains = ChainRegistry.GetAllChains()
+                .Select(c => (Chain: c, Fitness: ChainFitness.Calculate(c)))
+                .ToList();
+            if (chains.Count == 0)
+                return;
+
+            double averageFitness = chains.Average(c => c.Fitness);
+
+            foreach (var (chain, fitness) in chains)
             {
-                if (_random.NextDouble() < Config.ChainDecayRate)
+                if (_random.NextDouble() < DecayProbability(Config, fitness, averageFitness))
                 {
                     ChainRegistry.RemoveChain(chain.Id);
                     Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, "Decayed");
@@ -487,18 +507,25 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Each chain that passed validation and is at least StabilityThreshold ticks old copies
-        /// itself (see ChainReplicator) with probability ReplicationRate, or, with
-        /// FitnessWeightedReplication, ReplicationRate * its fitness / the average fitness of the
-        /// eligible chains (capped at 1), so fitter chains copy more often at the same average rate
+        /// Advances copies in progress (see ChainReplicator), then each chain that passed validation,
+        /// is at least StabilityThreshold ticks old and is not already copying starts a copy with
+        /// probability ReplicationRate, or, with FitnessWeightedReplication, ReplicationRate * its
+        /// fitness / the average fitness of the eligible chains (capped at 1), so fitter chains copy
+        /// more often at the same average rate
         /// </summary>
         internal void ReplicateChains(long currentTick)
         {
+            foreach (var (copy, parent) in ChainReplicator.Advance(currentTick, p => ChainRegistry.GetChain(p.Id) == p))
+            {
+                _pendingParentIds[copy.Id] = parent.Id;
+                TotalReplications++;
+            }
+
             if (Config.ReplicationRate <= 0.0f)
                 return;
 
             var eligible = ChainRegistry.GetAllChains()
-                .Where(c => c.PassedValidation && currentTick - c.CreatedAt >= Config.StabilityThreshold)
+                .Where(c => c.PassedValidation && currentTick - c.CreatedAt >= Config.StabilityThreshold && !ChainReplicator.IsCopying(c))
                 .Select(c => (Chain: c, Fitness: ChainFitness.Calculate(c)))
                 .ToList();
             if (eligible.Count == 0)
@@ -513,12 +540,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 if (_random.NextDouble() >= probability)
                     continue;
 
-                var copy = ChainReplicator.TryReplicate(parent, currentTick);
-                if (copy != null)
-                {
-                    _pendingParentIds[copy.Id] = parent.Id;
-                    TotalReplications++;
-                }
+                ChainReplicator.StartCopy(parent);
             }
         }
 
@@ -763,6 +785,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             TotalTokensRecycled = 0;
             TotalReplications = 0;
             _pendingParentIds.Clear();
+            ChainReplicator.CancelAll();
             TotalBondsFormed = 0;
             TotalBondsBroken = 0;
         }
@@ -1038,6 +1061,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (configState.ReplicationErrorRate.HasValue) config.ReplicationErrorRate = configState.ReplicationErrorRate.Value;
             if (configState.FitnessWeightedReplication.HasValue) config.FitnessWeightedReplication = configState.FitnessWeightedReplication.Value;
             if (configState.ChainDecayRate.HasValue) config.ChainDecayRate = configState.ChainDecayRate.Value;
+            if (configState.FitnessWeightedDecay.HasValue) config.FitnessWeightedDecay = configState.FitnessWeightedDecay.Value;
+            if (configState.ReplicationTimeout.HasValue) config.ReplicationTimeout = configState.ReplicationTimeout.Value;
             if (configState.TokenDistribution.HasValue) config.TokenDistribution = configState.TokenDistribution.Value;
             if (configState.VentPosition != null)
                 config.VentPosition = new Vector3Int(configState.VentPosition.X, configState.VentPosition.Y, configState.VentPosition.Z);

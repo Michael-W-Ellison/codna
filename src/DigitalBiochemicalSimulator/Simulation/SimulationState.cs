@@ -109,6 +109,8 @@ namespace DigitalBiochemicalSimulator.Simulation
         public float? ReplicationErrorRate { get; set; }
         public bool? FitnessWeightedReplication { get; set; }
         public float? ChainDecayRate { get; set; }
+        public bool? FitnessWeightedDecay { get; set; }
+        public int? ReplicationTimeout { get; set; }
         public TokenDistributionProfile? TokenDistribution { get; set; }
         public Vector3IntState? VentPosition { get; set; }
 
@@ -165,6 +167,8 @@ namespace DigitalBiochemicalSimulator.Simulation
                 ReplicationErrorRate = config.ReplicationErrorRate,
                 FitnessWeightedReplication = config.FitnessWeightedReplication,
                 ChainDecayRate = config.ChainDecayRate,
+                FitnessWeightedDecay = config.FitnessWeightedDecay,
+                ReplicationTimeout = config.ReplicationTimeout,
                 TokenDistribution = config.TokenDistribution,
                 VentPosition = new Vector3IntState { X = config.VentPosition.X, Y = config.VentPosition.Y, Z = config.VentPosition.Z }
             };

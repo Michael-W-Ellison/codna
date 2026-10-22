@@ -75,6 +75,12 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Chain turnover: chance per tick that a chain breaks down and returns its tokens (0 = never;
         // 0.0005 gives an average chain life of about 2000 ticks)
         public float ChainDecayRate { get; set; } = 0.0005f;
+
+        // Fitter chains (ChainFitness) decay proportionally more slowly; an average chain decays at ChainDecayRate
+        public bool FitnessWeightedDecay { get; set; } = true;
+
+        // Ticks a copy may spend gathering tokens before it is abandoned and its tokens released
+        public int ReplicationTimeout { get; set; } = 100;
         public int TicksPerSecond { get; set; } = 10;
         public int TickDuration => TicksPerSecond > 0 ? 1000 / TicksPerSecond : 1000;  // milliseconds, from TicksPerSecond
 
@@ -335,6 +341,12 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (ChainDecayRate < 0.0f || ChainDecayRate > 1.0f)
             {
                 errorMessage = "Chain decay rate must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ReplicationTimeout < 1)
+            {
+                errorMessage = "Replication timeout must be at least 1 tick";
                 return false;
             }
 

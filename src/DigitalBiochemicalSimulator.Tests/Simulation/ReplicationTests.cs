@@ -118,7 +118,8 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
                 simulation.Grid.AddToken(t);
             }
 
-            simulation.ReplicateChains(simulation.TickManager.CurrentTick);
+            simulation.ReplicateChains(simulation.TickManager.CurrentTick); // starts the copy
+            simulation.Step(); // gathers and bonds the copy
             simulation.Step(); // registers the copy
 
             Assert.Equal(1, simulation.TotalReplications);
@@ -216,6 +217,79 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             Assert.Equal("Decayed", simulation.Analytics.Evolution.GetLineage(chainId)?.DeathReason);
             Assert.All(tokens, t => Assert.Empty(t.BondedTokens));
             Assert.Empty(simulation.BondingManager.GetActiveChains());
+        }
+
+        [Fact]
+        public void Copy_GathersTokensOverSeveralTicks_AndReservesThem()
+        {
+            var (grid, manager, config) = CreateWorld();
+            var replicator = new ChainReplicator(manager, grid, config);
+            var parent = BuildParent(grid, manager);
+            var seven = MakeToken(10, TokenType.INTEGER_LITERAL, "7", new Vector3Int(6, 5, 0));
+            var plus = MakeToken(11, TokenType.OPERATOR_PLUS, "+", new Vector3Int(6, 5, 0));
+            grid.AddToken(seven);
+            grid.AddToken(plus);
+
+            Assert.True(replicator.StartCopy(parent));
+            Assert.Empty(replicator.Advance(1, _ => true)); // still missing the second operand
+            Assert.True(seven.IsReserved);
+            Assert.True(plus.IsReserved);
+            Assert.False(manager.AttemptBond(seven, plus, 1)); // reserved tokens do not bond
+
+            var nine = MakeToken(12, TokenType.INTEGER_LITERAL, "9", new Vector3Int(4, 5, 0));
+            grid.AddToken(nine);
+            var completed = replicator.Advance(2, _ => true);
+
+            var (copy, copyParent) = Assert.Single(completed);
+            Assert.Same(parent, copyParent);
+            Assert.Equal(parent.Tokens.Select(t => t.Type), copy.Tokens.Select(t => t.Type));
+            Assert.All(copy.Tokens, t => Assert.False(t.IsReserved));
+            Assert.Equal(0, replicator.CopiesInProgress);
+        }
+
+        [Fact]
+        public void Copy_NotCompletedWithinTimeout_ReleasesItsTokens()
+        {
+            var (grid, manager, config) = CreateWorld();
+            config.ReplicationTimeout = 2;
+            var replicator = new ChainReplicator(manager, grid, config);
+            var parent = BuildParent(grid, manager);
+            var seven = MakeToken(10, TokenType.INTEGER_LITERAL, "7", new Vector3Int(6, 5, 0));
+            grid.AddToken(seven);
+
+            replicator.StartCopy(parent);
+            for (int tick = 1; tick <= 3; tick++)
+                replicator.Advance(tick, _ => true);
+
+            Assert.Equal(0, replicator.CopiesInProgress);
+            Assert.False(seven.IsReserved);
+        }
+
+        [Fact]
+        public void Copy_WhoseParentIsGone_IsAbandoned()
+        {
+            var (grid, manager, config) = CreateWorld();
+            var replicator = new ChainReplicator(manager, grid, config);
+            var parent = BuildParent(grid, manager);
+            var seven = MakeToken(10, TokenType.INTEGER_LITERAL, "7", new Vector3Int(6, 5, 0));
+            grid.AddToken(seven);
+            replicator.StartCopy(parent);
+
+            replicator.Advance(1, _ => false);
+
+            Assert.Equal(0, replicator.CopiesInProgress);
+            Assert.False(seven.IsReserved);
+        }
+
+        [Theory]
+        [InlineData(true, 20.0, 10.0, 0.0005)]   // twice the average fitness: half the base rate
+        [InlineData(true, 5.0, 10.0, 0.002)]     // half the average: twice the base rate
+        [InlineData(false, 20.0, 10.0, 0.001)]   // weighting off: the base rate
+        public void DecayProbability_IsInverseToRelativeFitness(bool weighted, double fitness, double average, double expected)
+        {
+            var config = new SimulationConfig { ChainDecayRate = 0.001f, FitnessWeightedDecay = weighted };
+
+            Assert.Equal(expected, IntegratedSimulationEngine.DecayProbability(config, fitness, average), 6);
         }
 
         [Fact]

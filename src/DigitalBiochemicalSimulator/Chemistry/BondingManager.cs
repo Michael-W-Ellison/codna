@@ -43,6 +43,10 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (!token1.IsActive || !token2.IsActive)
                 return false;
 
+            // Tokens reserved for a copy in progress bond only when that copy is assembled
+            if (token1.IsReserved || token2.IsReserved)
+                return false;
+
             // Prevent self-bonding
             if (token1.Id == token2.Id)
                 return false;
