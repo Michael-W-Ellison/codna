@@ -11,7 +11,8 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// Template-directed replication: a chain that has passed validation assembles a copy of
     /// itself from free (unbonded) tokens nearby. The copy matches the parent's token types in
     /// order; its values come from the tokens it is built from. Copying errors:
-    /// - substitution (ReplicationErrorRate, per position): the position takes a token of a different type
+    /// - substitution (ReplicationErrorRate, per position, decided when the copy starts): the
+    ///   position takes a token of a different type
     /// - insertion (ReplicationInsertionRate, per copy): a run of 1-2 positions is duplicated in place
     /// - deletion (ReplicationDeletionRate, per copy): a run of 1-2 positions is left out
     ///
@@ -58,7 +59,8 @@ namespace DigitalBiochemicalSimulator.Simulation
 
             var template = MutateTemplate(parent.Tokens.Select(t => t.Type).ToArray(), _random,
                 _config.ReplicationInsertionRate, _config.ReplicationDeletionRate);
-            var copy = new CopyInProgress(_nextCopyId++, parent, template);
+            var substitutions = template.Select(_ => _random.NextDouble() < _config.ReplicationErrorRate).ToArray();
+            var copy = new CopyInProgress(_nextCopyId++, parent, template, substitutions);
             _copies.Add(copy);
             Gather(copy);
             return true;
@@ -163,7 +165,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                     continue;
 
                 var needed = copy.TemplateTypes[i];
-                bool copyingError = _random.NextDouble() < _config.ReplicationErrorRate;
+                bool copyingError = copy.Substitutions[i];
                 var candidates = available.Where(t => !t.IsReserved && (copyingError ? t.Type != needed : t.Type == needed)).ToList();
                 if (candidates.Count == 0)
                     continue;
@@ -223,22 +225,24 @@ namespace DigitalBiochemicalSimulator.Simulation
 
         /// <summary>
         /// A copy being assembled: the token types to copy (the parent's, after insertion and
-        /// deletion errors, fixed when the copy starts) and the
-        /// tokens reserved for each position so far
+        /// deletion errors) and the positions that take a different type, all fixed when the copy
+        /// starts, and the tokens reserved for each position so far
         /// </summary>
         private class CopyInProgress
         {
             public long Id { get; }
             public TokenChain Parent { get; }
             public TokenType[] TemplateTypes { get; }
+            public bool[] Substitutions { get; }   // positions that take a token of a different type
             public Token?[] Slots { get; }
             public int Age { get; set; }
 
-            public CopyInProgress(long id, TokenChain parent, TokenType[] templateTypes)
+            public CopyInProgress(long id, TokenChain parent, TokenType[] templateTypes, bool[] substitutions)
             {
                 Id = id;
                 Parent = parent;
                 TemplateTypes = templateTypes;
+                Substitutions = substitutions;
                 Slots = new Token?[TemplateTypes.Length];
             }
 

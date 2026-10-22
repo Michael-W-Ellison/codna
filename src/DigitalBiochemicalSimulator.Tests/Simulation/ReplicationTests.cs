@@ -97,6 +97,34 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         }
 
         [Fact]
+        public void Gather_DecidesEachPositionsSubstitutionOnce_NotOnEveryTickItWaits()
+        {
+            // Only semicolons are free, so a position fills only if it was chosen as a substitution.
+            // Waiting 50 ticks must not raise the per-position rate above ReplicationErrorRate.
+            int positions = 0, filled = 0;
+            for (int trial = 0; trial < 200; trial++)
+            {
+                var (grid, manager, config) = CreateWorld(errorRate: 0.2f);
+                var parent = BuildParent(grid, manager);
+                var semicolons = Enumerable.Range(10, 3)
+                    .Select(id => MakeToken(id, TokenType.SEMICOLON, ";", new Vector3Int(6, 5, 0)))
+                    .ToList();
+                foreach (var t in semicolons) grid.AddToken(t);
+                var replicator = new ChainReplicator(manager, grid, config, new System.Random(trial));
+
+                Assert.True(replicator.StartCopy(parent));
+                for (int tick = 1; tick <= 50; tick++)
+                    replicator.Advance(tick, _ => true);
+
+                positions += parent.Tokens.Count;
+                filled += semicolons.Count(t => t.IsReserved);
+                replicator.CancelAll();
+            }
+
+            Assert.InRange(filled / (double)positions, 0.1, 0.3);
+        }
+
+        [Fact]
         public void Engine_RecordsParentAndGenerationOfCopies()
         {
             var config = SimulationConfig.CreateMinimal();
