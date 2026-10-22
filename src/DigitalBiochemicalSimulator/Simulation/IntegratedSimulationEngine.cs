@@ -400,6 +400,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             SyncChainRegistry(currentTick);
             var trackedIds = RegisteredChainIds();
 
+            // Chain turnover: chains break down at random and return their tokens
+            DecayChains(currentTick);
+            trackedIds = RegisteredChainIds();
+
             // Update stability scores and stable status
             ChainRegistry.UpdateAllStabilities(currentTick);
 
@@ -454,20 +458,59 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
+        /// Chance per tick that an eligible chain replicates
+        /// </summary>
+        internal static double ReplicationProbability(SimulationConfig config, double fitness, double averageFitness)
+        {
+            return config.FitnessWeightedReplication && averageFitness > 0
+                ? Math.Min(1.0, config.ReplicationRate * fitness / averageFitness)
+                : config.ReplicationRate;
+        }
+
+        /// <summary>
+        /// Each chain breaks down with probability ChainDecayRate; its lineage ends as Decayed and its
+        /// bonds are broken by the dissolve step, returning its tokens to the pool
+        /// </summary>
+        private void DecayChains(long currentTick)
+        {
+            if (Config.ChainDecayRate <= 0.0f)
+                return;
+
+            foreach (var chain in ChainRegistry.GetAllChains())
+            {
+                if (_random.NextDouble() < Config.ChainDecayRate)
+                {
+                    ChainRegistry.RemoveChain(chain.Id);
+                    Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, "Decayed");
+                }
+            }
+        }
+
+        /// <summary>
         /// Each chain that passed validation and is at least StabilityThreshold ticks old copies
-        /// itself with probability ReplicationRate (see ChainReplicator)
+        /// itself (see ChainReplicator) with probability ReplicationRate, or, with
+        /// FitnessWeightedReplication, ReplicationRate * its fitness / the average fitness of the
+        /// eligible chains (capped at 1), so fitter chains copy more often at the same average rate
         /// </summary>
         internal void ReplicateChains(long currentTick)
         {
             if (Config.ReplicationRate <= 0.0f)
                 return;
 
-            foreach (var parent in ChainRegistry.GetAllChains())
-            {
-                if (!parent.PassedValidation || currentTick - parent.CreatedAt < Config.StabilityThreshold)
-                    continue;
+            var eligible = ChainRegistry.GetAllChains()
+                .Where(c => c.PassedValidation && currentTick - c.CreatedAt >= Config.StabilityThreshold)
+                .Select(c => (Chain: c, Fitness: ChainFitness.Calculate(c)))
+                .ToList();
+            if (eligible.Count == 0)
+                return;
 
-                if (_random.NextDouble() >= Config.ReplicationRate)
+            double averageFitness = eligible.Average(e => e.Fitness);
+
+            foreach (var (parent, fitness) in eligible)
+            {
+                double probability = ReplicationProbability(Config, fitness, averageFitness);
+
+                if (_random.NextDouble() >= probability)
                     continue;
 
                 var copy = ChainReplicator.TryReplicate(parent, currentTick);
@@ -993,6 +1036,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (configState.ReplicationRate.HasValue) config.ReplicationRate = configState.ReplicationRate.Value;
             if (configState.ReplicationRange.HasValue) config.ReplicationRange = configState.ReplicationRange.Value;
             if (configState.ReplicationErrorRate.HasValue) config.ReplicationErrorRate = configState.ReplicationErrorRate.Value;
+            if (configState.FitnessWeightedReplication.HasValue) config.FitnessWeightedReplication = configState.FitnessWeightedReplication.Value;
+            if (configState.ChainDecayRate.HasValue) config.ChainDecayRate = configState.ChainDecayRate.Value;
             if (configState.TokenDistribution.HasValue) config.TokenDistribution = configState.TokenDistribution.Value;
             if (configState.VentPosition != null)
                 config.VentPosition = new Vector3Int(configState.VentPosition.X, configState.VentPosition.Y, configState.VentPosition.Z);

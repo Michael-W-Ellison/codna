@@ -68,6 +68,13 @@ namespace DigitalBiochemicalSimulator.Simulation
 
         // Probability that a copy takes a token of a different type at one position (copying error)
         public float ReplicationErrorRate { get; set; } = 0.05f;
+
+        // Fitter chains (ChainFitness) replicate proportionally more often; the average rate stays ReplicationRate
+        public bool FitnessWeightedReplication { get; set; } = true;
+
+        // Chain turnover: chance per tick that a chain breaks down and returns its tokens (0 = never;
+        // 0.0005 gives an average chain life of about 2000 ticks)
+        public float ChainDecayRate { get; set; } = 0.0005f;
         public int TicksPerSecond { get; set; } = 10;
         public int TickDuration => TicksPerSecond > 0 ? 1000 / TicksPerSecond : 1000;  // milliseconds, from TicksPerSecond
 
@@ -322,6 +329,12 @@ namespace DigitalBiochemicalSimulator.Simulation
                 ReplicationErrorRate < 0.0f || ReplicationErrorRate > 1.0f)
             {
                 errorMessage = "Replication rate and replication error rate must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ChainDecayRate < 0.0f || ChainDecayRate > 1.0f)
+            {
+                errorMessage = "Chain decay rate must be between 0.0 and 1.0";
                 return false;
             }
 

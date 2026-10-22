@@ -227,6 +227,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void MaxChains_Zero_DissolvesChains()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.MaxChains = 0;
             var simulation = new IntegratedSimulationEngine(config);
             var token1 = MakeToken(1001, TokenType.INTEGER_LITERAL, "5", new Vector3Int(1, 1, 0));
@@ -244,6 +245,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void ChainRegistry_TracksBondingManagerChains()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ValidationFrequency = 0;
             var simulation = new IntegratedSimulationEngine(config);
             var token1 = MakeToken(1001, TokenType.INTEGER_LITERAL, "5", new Vector3Int(1, 1, 0));
@@ -262,6 +264,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Validation_DissolvesInvalidChains(int minValidationLength, int stabilityThreshold, bool expectDissolved)
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ValidationFrequency = 1;
             config.MinValidationLength = minValidationLength;
             config.StabilityThreshold = stabilityThreshold;

@@ -834,6 +834,16 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
                         .Validate(v => v >= 0.0f && v <= 1.0f));
 
+                config.FitnessWeightedReplication = AnsiConsole.Confirm(
+                    "[cyan]Fitness-weighted copying (longer, more complete chains copy more often)?[/]",
+                    config.FitnessWeightedReplication);
+
+                config.ChainDecayRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Chain Decay Rate (chance per tick a chain breaks down, 0 = never):[/]")
+                        .DefaultValue(config.ChainDecayRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Replication configured");
             }
 

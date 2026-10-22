@@ -37,6 +37,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Lineage_IsRecordedWhenChainForms()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ValidationFrequency = 0;
             var simulation = CreateSimulationWithChain(config, out _, out _);
 
@@ -52,6 +53,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Lineage_EndsWithReason_WhenChainIsRemovedByChainLimit()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.MaxChains = 0;
             var simulation = CreateSimulationWithChain(config, out var token1, out _);
             long chainId = simulation.BondingManager.GetTokenChain(token1)!.Id;
@@ -68,6 +70,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Lineage_EndsAsRestructured_WhenChainLosesItsBonds()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ValidationFrequency = 0;
             var simulation = CreateSimulationWithChain(config, out var token1, out var token2);
             long chainId = simulation.BondingManager.GetTokenChain(token1)!.Id;
@@ -251,6 +254,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Recycling_NeverRemovesBondedTokens()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.MaxActiveTokens = 2;
             config.VentEmissionRate = 1;
             config.ValidationFrequency = 0;
@@ -278,6 +282,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Validation_ChecksChainsThatKeepBonding(long currentTick, bool expectDissolved)
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.MinValidationLength = 3;
             config.StabilityThreshold = 10;
             var simulation = new IntegratedSimulationEngine(config);

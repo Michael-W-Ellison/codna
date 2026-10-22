@@ -99,6 +99,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Engine_RecordsParentAndGenerationOfCopies()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ReplicationRate = 1.0f;
             config.ReplicationErrorRate = 0.0f;
             config.ValidationFrequency = 0;
@@ -133,6 +134,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         public void Engine_CopiesMadeDuringStepsSurviveAndAreRecordedAsDescendants()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ReplicationRate = 1.0f;
             config.ReplicationErrorRate = 0.0f;
             config.ValidationFrequency = 1;
@@ -167,10 +169,60 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             Assert.Contains(parent.Id, simulation.Analytics.Evolution.GetLineage(copy.Id)!.ParentIds);
         }
 
+        [Theory]
+        [InlineData("5 + 3", 3.0)]                 // 3 tokens, incomplete, no statement kinds
+        [InlineData("5 + 3 ;", 8.0)]               // 4 tokens, complete statement: x2
+        [InlineData("int x = 5 ;", 20.0)]          // 5 tokens, complete, declaration + assignment: x2 x2
+        [InlineData("if ( x ) { y = 1 ; }", 50.0)] // 10 tokens, complete, control + block + assignment: x2 x2.5
+        public void ChainFitness_RewardsLengthAndCompleteness(string code, double expected)
+        {
+            var symbols = new System.Collections.Generic.Dictionary<string, TokenType>
+            {
+                ["+"] = TokenType.OPERATOR_PLUS, ["="] = TokenType.OPERATOR_ASSIGN, [";"] = TokenType.SEMICOLON,
+                ["("] = TokenType.PAREN_OPEN, [")"] = TokenType.PAREN_CLOSE, ["{"] = TokenType.BRACE_OPEN,
+                ["}"] = TokenType.BRACE_CLOSE, ["int"] = TokenType.TYPE_INT, ["if"] = TokenType.KEYWORD_IF
+            };
+            var tokens = code.Split(' ').Select((text, i) => MakeToken(i + 1,
+                symbols.TryGetValue(text, out var type) ? type : char.IsDigit(text[0]) ? TokenType.INTEGER_LITERAL : TokenType.IDENTIFIER,
+                text, Vector3Int.Zero)).ToArray();
+
+            Assert.Equal(expected, ChainFitness.Calculate(TestHelpers.TestChains.Build(tokens)), 5);
+        }
+
+        [Theory]
+        [InlineData(true, 20.0, 10.0, 0.2)]   // twice the average fitness: twice the base rate
+        [InlineData(true, 5.0, 10.0, 0.05)]   // half the average: half the base rate
+        [InlineData(true, 200.0, 10.0, 1.0)]  // capped at 1
+        [InlineData(false, 20.0, 10.0, 0.1)]  // weighting off: the base rate
+        public void ReplicationProbability_IsProportionalToRelativeFitness(bool weighted, double fitness, double average, double expected)
+        {
+            var config = new SimulationConfig { ReplicationRate = 0.1f, FitnessWeightedReplication = weighted };
+
+            Assert.Equal(expected, IntegratedSimulationEngine.ReplicationProbability(config, fitness, average), 5);
+        }
+
+        [Fact]
+        public void Decay_BreaksChainAndRecordsDecayed()
+        {
+            var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 1.0f;
+            config.ValidationFrequency = 0;
+            var simulation = new IntegratedSimulationEngine(config);
+            var parent = BuildParent(simulation.Grid, simulation.BondingManager);
+            long chainId = parent.Id;
+            var tokens = parent.Tokens.ToList();
+            simulation.Step(); // registered, then decays in the same tick
+
+            Assert.Equal("Decayed", simulation.Analytics.Evolution.GetLineage(chainId)?.DeathReason);
+            Assert.All(tokens, t => Assert.Empty(t.BondedTokens));
+            Assert.Empty(simulation.BondingManager.GetActiveChains());
+        }
+
         [Fact]
         public void Engine_DoesNotReplicateChainsThatHaveNotPassedValidation()
         {
             var config = SimulationConfig.CreateMinimal();
+            config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ReplicationRate = 1.0f;
             config.StabilityThreshold = 0;
             var simulation = new IntegratedSimulationEngine(config);
