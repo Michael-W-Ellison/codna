@@ -180,6 +180,23 @@ namespace DigitalBiochemicalSimulator.Grammar
                     {
                         result.Errors.Add($"Operator '{token.Value}' at position {i} missing operands");
                         result.IsValid = false;
+                        continue;
+                    }
+
+                    // Division or modulo by a literal zero
+                    if ((token.Type == TokenType.OPERATOR_DIVIDE || token.Type == TokenType.OPERATOR_MODULO ||
+                         token.Type == TokenType.OPERATOR_DIVIDE_ASSIGN) &&
+                        IsLiteralZero(chain.Tokens[i + 1]))
+                    {
+                        result.Errors.Add($"Division by zero at position {i}");
+                        result.IsValid = false;
+                    }
+
+                    // Assignment needs a variable on its left
+                    if (IsAssignmentOperator(token) && chain.Tokens[i - 1].Type != TokenType.IDENTIFIER)
+                    {
+                        result.Errors.Add($"Assignment '{token.Value}' at position {i} has no variable on its left");
+                        result.IsValid = false;
                     }
                 }
             }
@@ -246,7 +263,9 @@ namespace DigitalBiochemicalSimulator.Grammar
             if (token.Type == TokenType.STRING_LITERAL)
                 return "string";
 
-            if (token.Type == TokenType.BOOLEAN_LITERAL)
+            if (token.Type == TokenType.BOOLEAN_LITERAL ||
+                token.Type == TokenType.KEYWORD_TRUE ||
+                token.Type == TokenType.KEYWORD_FALSE)
                 return "bool";
 
             if (token.Type == TokenType.IDENTIFIER)
@@ -308,7 +327,9 @@ namespace DigitalBiochemicalSimulator.Grammar
             if (operatorToken.Type == TokenType.OPERATOR_EQUALS ||
                 operatorToken.Type == TokenType.OPERATOR_NOT_EQUALS ||
                 operatorToken.Type == TokenType.OPERATOR_LESS_THAN ||
-                operatorToken.Type == TokenType.OPERATOR_GREATER_THAN)
+                operatorToken.Type == TokenType.OPERATOR_GREATER_THAN ||
+                operatorToken.Type == TokenType.OPERATOR_LESS_THAN_OR_EQUAL ||
+                operatorToken.Type == TokenType.OPERATOR_GREATER_THAN_OR_EQUAL)
             {
                 // Same types can be compared
                 if (leftType == rightType)
@@ -354,8 +375,29 @@ namespace DigitalBiochemicalSimulator.Grammar
                    token.Type == TokenType.OPERATOR_NOT_EQUALS ||
                    token.Type == TokenType.OPERATOR_LESS_THAN ||
                    token.Type == TokenType.OPERATOR_GREATER_THAN ||
+                   token.Type == TokenType.OPERATOR_LESS_THAN_OR_EQUAL ||
+                   token.Type == TokenType.OPERATOR_GREATER_THAN_OR_EQUAL ||
+                   token.Type == TokenType.OPERATOR_POWER ||
                    token.Type == TokenType.OPERATOR_AND ||
-                   token.Type == TokenType.OPERATOR_OR;
+                   token.Type == TokenType.OPERATOR_OR ||
+                   IsAssignmentOperator(token);
+        }
+
+        private static bool IsAssignmentOperator(Token token)
+        {
+            return token.Type == TokenType.OPERATOR_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_PLUS_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_MINUS_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_MULTIPLY_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_DIVIDE_ASSIGN;
+        }
+
+        private static bool IsLiteralZero(Token token)
+        {
+            return (token.Type == TokenType.INTEGER_LITERAL || token.Type == TokenType.FLOAT_LITERAL) &&
+                   double.TryParse(token.Value, System.Globalization.NumberStyles.Float,
+                       System.Globalization.CultureInfo.InvariantCulture, out var value) &&
+                   value == 0;
         }
 
         /// <summary>

@@ -434,47 +434,138 @@ namespace DigitalBiochemicalSimulator.Core
         /// </summary>
         private bool CheckExpressionStructure()
         {
-            // Simple check: operators should be between operands
+            // State machine over the token sequence: operands and binary operators must alternate,
+            // and the chain must end on a complete expression or statement
             bool expectOperand = true;
 
-            foreach (var token in Tokens)
+            for (int i = 0; i < Tokens.Count; i++)
             {
-                bool isOperand = token.Type == TokenType.INTEGER_LITERAL ||
-                                token.Type == TokenType.FLOAT_LITERAL ||
-                                token.Type == TokenType.IDENTIFIER;
+                var type = Tokens[i].Type;
+                var next = i + 1 < Tokens.Count ? Tokens[i + 1].Type : (TokenType?)null;
+                var previous = i > 0 ? Tokens[i - 1].Type : (TokenType?)null;
 
-                bool isOperator = token.Type == TokenType.OPERATOR_PLUS ||
-                                 token.Type == TokenType.OPERATOR_MINUS ||
-                                 token.Type == TokenType.OPERATOR_MULTIPLY ||
-                                 token.Type == TokenType.OPERATOR_DIVIDE;
-
-                if (expectOperand && !isOperand)
+                if (IsOperandType(type))
                 {
-                    // Allow parentheses and keywords
-                    if (token.Type != TokenType.PAREN_OPEN &&
-                        token.Type != TokenType.KEYWORD_IF &&
-                        token.Type != TokenType.KEYWORD_WHILE)
-                    {
+                    if (!expectOperand)
                         return false;
-                    }
-                }
-                else if (!expectOperand && !isOperator)
-                {
-                    // Allow closing parentheses and semicolons
-                    if (token.Type != TokenType.PAREN_CLOSE &&
-                        token.Type != TokenType.SEMICOLON)
-                    {
-                        return false;
-                    }
-                }
-
-                if (isOperand)
                     expectOperand = false;
-                if (isOperator)
+                }
+                else if (IsBinaryOperatorType(type))
+                {
+                    if (expectOperand)
+                        return false;
                     expectOperand = true;
+                }
+                else if (type == TokenType.OPERATOR_NOT)
+                {
+                    // Unary prefix operator
+                    if (!expectOperand)
+                        return false;
+                }
+                else if (type == TokenType.PAREN_OPEN)
+                {
+                    if (!expectOperand)
+                        return false;
+                }
+                else if (type == TokenType.PAREN_CLOSE)
+                {
+                    if (expectOperand)
+                        return false;
+                }
+                else if (type == TokenType.KEYWORD_IF || type == TokenType.KEYWORD_WHILE)
+                {
+                    // Must start an expression and be followed by its condition in parentheses
+                    if (!expectOperand || next != TokenType.PAREN_OPEN)
+                        return false;
+                }
+                else if (type == TokenType.KEYWORD_RETURN)
+                {
+                    if (!expectOperand)
+                        return false;
+                }
+                else if (IsDeclarationKeyword(type))
+                {
+                    // Declarations name a variable: "int x", "var x"
+                    if (!expectOperand || next != TokenType.IDENTIFIER)
+                        return false;
+                }
+                else if (type == TokenType.SEMICOLON)
+                {
+                    // Ends a complete statement; a new statement may follow
+                    if (expectOperand)
+                        return false;
+                    expectOperand = true;
+                }
+                else if (type == TokenType.BRACE_OPEN)
+                {
+                    // A block follows a condition: "if ( x ) {"
+                    if (previous != TokenType.PAREN_CLOSE)
+                        return false;
+                    expectOperand = true;
+                }
+                else if (type == TokenType.BRACE_CLOSE)
+                {
+                    // Closes a block at a statement boundary
+                    if (previous != TokenType.SEMICOLON && previous != TokenType.BRACE_OPEN && previous != TokenType.BRACE_CLOSE)
+                        return false;
+                    expectOperand = true;
+                }
+                else
+                {
+                    // Tokens with no place in an expression or statement here
+                    return false;
+                }
             }
 
-            return true;
+            // Must not end waiting for an operand (e.g. "5 +" or "if (") unless a statement or block just ended
+            var last = Tokens[Tokens.Count - 1].Type;
+            return !expectOperand || last == TokenType.SEMICOLON || last == TokenType.BRACE_CLOSE;
+        }
+
+        private static bool IsOperandType(TokenType type)
+        {
+            return type == TokenType.INTEGER_LITERAL ||
+                   type == TokenType.FLOAT_LITERAL ||
+                   type == TokenType.STRING_LITERAL ||
+                   type == TokenType.BOOLEAN_LITERAL ||
+                   type == TokenType.IDENTIFIER ||
+                   type == TokenType.KEYWORD_TRUE ||
+                   type == TokenType.KEYWORD_FALSE ||
+                   type == TokenType.KEYWORD_NULL;
+        }
+
+        private static bool IsBinaryOperatorType(TokenType type)
+        {
+            return type == TokenType.OPERATOR_PLUS ||
+                   type == TokenType.OPERATOR_MINUS ||
+                   type == TokenType.OPERATOR_MULTIPLY ||
+                   type == TokenType.OPERATOR_DIVIDE ||
+                   type == TokenType.OPERATOR_MODULO ||
+                   type == TokenType.OPERATOR_POWER ||
+                   type == TokenType.OPERATOR_ASSIGN ||
+                   type == TokenType.OPERATOR_PLUS_ASSIGN ||
+                   type == TokenType.OPERATOR_MINUS_ASSIGN ||
+                   type == TokenType.OPERATOR_MULTIPLY_ASSIGN ||
+                   type == TokenType.OPERATOR_DIVIDE_ASSIGN ||
+                   type == TokenType.OPERATOR_EQUALS ||
+                   type == TokenType.OPERATOR_NOT_EQUALS ||
+                   type == TokenType.OPERATOR_LESS_THAN ||
+                   type == TokenType.OPERATOR_GREATER_THAN ||
+                   type == TokenType.OPERATOR_LESS_THAN_OR_EQUAL ||
+                   type == TokenType.OPERATOR_GREATER_THAN_OR_EQUAL ||
+                   type == TokenType.OPERATOR_AND ||
+                   type == TokenType.OPERATOR_OR;
+        }
+
+        private static bool IsDeclarationKeyword(TokenType type)
+        {
+            return type == TokenType.TYPE_INT ||
+                   type == TokenType.TYPE_FLOAT ||
+                   type == TokenType.TYPE_STRING ||
+                   type == TokenType.TYPE_BOOL ||
+                   type == TokenType.KEYWORD_VAR ||
+                   type == TokenType.KEYWORD_LET ||
+                   type == TokenType.KEYWORD_CONST;
         }
 
         /// <summary>

@@ -61,6 +61,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public ChainAnalyzer ChainAnalyzer { get; private set; }
         private List<ComprehensiveAnalysisResult> _latestAnalysis;
         private readonly object _analysisLock = new object();
+        private readonly SemanticValidator _semanticValidator = new SemanticValidator();
 
         // State
         public List<Token> ActiveTokens { get; private set; }
@@ -397,8 +398,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             // Validate chains every ValidationFrequency ticks
             if (Config.ValidationFrequency > 0 && currentTick % Config.ValidationFrequency == 0)
             {
-                ValidateChains(currentTick);
-                trackedIds = RecordChainDeaths(trackedIds, "Invalid", currentTick);
+                ValidateChains(currentTick); // records the end of each chain it removes
+                trackedIds = RegisteredChainIds();
             }
 
             EnforceChainLimit();
@@ -463,7 +464,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// Validates chains that have reached MinValidationLength and either have not bonded for
         /// StabilityThreshold ticks or, while still bonding, have gone StabilityThreshold ticks since
         /// they formed or were last validated (so a chain cannot avoid validation by growing).
-        /// Chains that fail validation are removed from the registry.
+        /// A chain must pass the syntax check (TokenChain.ValidateChain) and the semantic check
+        /// (SemanticValidator); chains that fail either are removed from the registry, and their
+        /// lineage ends with reason InvalidSyntax or InvalidSemantics.
         /// </summary>
         internal void ValidateChains(long currentTick)
         {
@@ -478,8 +481,23 @@ namespace DigitalBiochemicalSimulator.Simulation
                     continue;
 
                 chain.LastValidatedTick = currentTick;
+
+                string? failure = null;
                 if (!chain.ValidateChain().IsValid)
+                {
+                    failure = "InvalidSyntax";
+                }
+                else if (!_semanticValidator.ValidateChain(chain).IsValid)
+                {
+                    chain.IsValid = false;
+                    failure = "InvalidSemantics";
+                }
+
+                if (failure != null)
+                {
                     ChainRegistry.RemoveChain(chain.Id);
+                    Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, failure);
+                }
             }
         }
 
