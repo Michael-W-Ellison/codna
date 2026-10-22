@@ -1059,6 +1059,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (configState.ReplicationRate.HasValue) config.ReplicationRate = configState.ReplicationRate.Value;
             if (configState.ReplicationRange.HasValue) config.ReplicationRange = configState.ReplicationRange.Value;
             if (configState.ReplicationErrorRate.HasValue) config.ReplicationErrorRate = configState.ReplicationErrorRate.Value;
+            if (configState.ReplicationInsertionRate.HasValue) config.ReplicationInsertionRate = configState.ReplicationInsertionRate.Value;
+            if (configState.ReplicationDeletionRate.HasValue) config.ReplicationDeletionRate = configState.ReplicationDeletionRate.Value;
             if (configState.FitnessWeightedReplication.HasValue) config.FitnessWeightedReplication = configState.FitnessWeightedReplication.Value;
             if (configState.ChainDecayRate.HasValue) config.ChainDecayRate = configState.ChainDecayRate.Value;
             if (configState.FitnessWeightedDecay.HasValue) config.FitnessWeightedDecay = configState.FitnessWeightedDecay.Value;

@@ -10,8 +10,10 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// <summary>
     /// Template-directed replication: a chain that has passed validation assembles a copy of
     /// itself from free (unbonded) tokens nearby. The copy matches the parent's token types in
-    /// order; its values come from the tokens it is built from. With probability
-    /// ReplicationErrorRate a position takes a token of a different type (a copying error).
+    /// order; its values come from the tokens it is built from. Copying errors:
+    /// - substitution (ReplicationErrorRate, per position): the position takes a token of a different type
+    /// - insertion (ReplicationInsertionRate, per copy): a run of 1-2 positions is duplicated in place
+    /// - deletion (ReplicationDeletionRate, per copy): a run of 1-2 positions is left out
     ///
     /// A copy is built over several ticks: each tick it reserves free tokens of the types it still
     /// needs from within ReplicationRange cells of the parent's tokens. Reserved tokens cannot bond
@@ -54,7 +56,9 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (parent.Tokens.Count < 2 || IsCopying(parent))
                 return false;
 
-            var copy = new CopyInProgress(_nextCopyId++, parent);
+            var template = MutateTemplate(parent.Tokens.Select(t => t.Type).ToArray(), _random,
+                _config.ReplicationInsertionRate, _config.ReplicationDeletionRate);
+            var copy = new CopyInProgress(_nextCopyId++, parent, template);
             _copies.Add(copy);
             Gather(copy);
             return true;
@@ -121,6 +125,32 @@ namespace DigitalBiochemicalSimulator.Simulation
             }
 
             return Assemble(copy, currentTick);
+        }
+
+        /// <summary>
+        /// Applies insertion and deletion copying errors to a template. Insertion duplicates a
+        /// random run of 1-2 positions directly after itself; deletion removes a random run of
+        /// 1-2 positions. A template never drops below 2 positions.
+        /// </summary>
+        internal static TokenType[] MutateTemplate(TokenType[] template, Random random, double insertionRate, double deletionRate)
+        {
+            var result = template.ToList();
+
+            if (random.NextDouble() < insertionRate)
+            {
+                int length = Math.Min(result.Count, 1 + random.Next(2));
+                int start = random.Next(result.Count - length + 1);
+                result.InsertRange(start + length, result.GetRange(start, length));
+            }
+
+            if (random.NextDouble() < deletionRate)
+            {
+                int length = Math.Min(result.Count - 2, 1 + random.Next(2));
+                if (length > 0)
+                    result.RemoveRange(random.Next(result.Count - length + 1), length);
+            }
+
+            return result.ToArray();
         }
 
         private void Gather(CopyInProgress copy)
@@ -192,7 +222,8 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// A copy being assembled: the parent's token types (fixed when the copy starts) and the
+        /// A copy being assembled: the token types to copy (the parent's, after insertion and
+        /// deletion errors, fixed when the copy starts) and the
         /// tokens reserved for each position so far
         /// </summary>
         private class CopyInProgress
@@ -203,11 +234,11 @@ namespace DigitalBiochemicalSimulator.Simulation
             public Token?[] Slots { get; }
             public int Age { get; set; }
 
-            public CopyInProgress(long id, TokenChain parent)
+            public CopyInProgress(long id, TokenChain parent, TokenType[] templateTypes)
             {
                 Id = id;
                 Parent = parent;
-                TemplateTypes = parent.Tokens.Select(t => t.Type).ToArray();
+                TemplateTypes = templateTypes;
                 Slots = new Token?[TemplateTypes.Length];
             }
 

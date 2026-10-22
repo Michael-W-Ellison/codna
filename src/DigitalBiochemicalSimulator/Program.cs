@@ -834,6 +834,18 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
                         .Validate(v => v >= 0.0f && v <= 1.0f));
 
+                config.ReplicationInsertionRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Insertion Rate (chance a copy duplicates 1-2 positions):[/]")
+                        .DefaultValue(config.ReplicationInsertionRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.ReplicationDeletionRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Deletion Rate (chance a copy leaves out 1-2 positions):[/]")
+                        .DefaultValue(config.ReplicationDeletionRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
                 config.FitnessWeightedReplication = AnsiConsole.Confirm(
                     "[cyan]Fitness-weighted copying (longer, more complete chains copy more often)?[/]",
                     config.FitnessWeightedReplication);

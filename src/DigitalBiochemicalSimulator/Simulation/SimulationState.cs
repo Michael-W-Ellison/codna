@@ -107,6 +107,8 @@ namespace DigitalBiochemicalSimulator.Simulation
         public float? ReplicationRate { get; set; }
         public int? ReplicationRange { get; set; }
         public float? ReplicationErrorRate { get; set; }
+        public float? ReplicationInsertionRate { get; set; }
+        public float? ReplicationDeletionRate { get; set; }
         public bool? FitnessWeightedReplication { get; set; }
         public float? ChainDecayRate { get; set; }
         public bool? FitnessWeightedDecay { get; set; }
@@ -165,6 +167,8 @@ namespace DigitalBiochemicalSimulator.Simulation
                 ReplicationRate = config.ReplicationRate,
                 ReplicationRange = config.ReplicationRange,
                 ReplicationErrorRate = config.ReplicationErrorRate,
+                ReplicationInsertionRate = config.ReplicationInsertionRate,
+                ReplicationDeletionRate = config.ReplicationDeletionRate,
                 FitnessWeightedReplication = config.FitnessWeightedReplication,
                 ChainDecayRate = config.ChainDecayRate,
                 FitnessWeightedDecay = config.FitnessWeightedDecay,

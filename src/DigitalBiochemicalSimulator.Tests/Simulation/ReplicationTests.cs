@@ -17,7 +17,8 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
 
         private static (Grid grid, BondingManager manager, SimulationConfig config) CreateWorld(float errorRate = 0.0f)
         {
-            var config = new SimulationConfig(10, 10, 10) { ReplicationRange = 2, ReplicationErrorRate = errorRate };
+            var config = new SimulationConfig(10, 10, 10) { ReplicationRange = 2, ReplicationErrorRate = errorRate,
+                ReplicationInsertionRate = 0.0f, ReplicationDeletionRate = 0.0f };
             var grid = new Grid(10, 10, 10);
             var rulesEngine = new BondRulesEngine(GrammarLibrary.GetDefaultGrammar());
             return (grid, new BondingManager(rulesEngine, new BondStrengthCalculator(rulesEngine), config, grid), config);
@@ -102,6 +103,8 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ReplicationRate = 1.0f;
             config.ReplicationErrorRate = 0.0f;
+            config.ReplicationInsertionRate = 0.0f;
+            config.ReplicationDeletionRate = 0.0f;
             config.ValidationFrequency = 0;
             config.StabilityThreshold = 0;
             var simulation = new IntegratedSimulationEngine(config);
@@ -138,6 +141,8 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             config.ChainDecayRate = 0; // chains must not decay at random during the test
             config.ReplicationRate = 1.0f;
             config.ReplicationErrorRate = 0.0f;
+            config.ReplicationInsertionRate = 0.0f;
+            config.ReplicationDeletionRate = 0.0f;
             config.ValidationFrequency = 1;
             config.StabilityThreshold = 0;
             config.MinValidationLength = 3;
@@ -290,6 +295,104 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             var config = new SimulationConfig { ChainDecayRate = 0.001f, FitnessWeightedDecay = weighted };
 
             Assert.Equal(expected, IntegratedSimulationEngine.DecayProbability(config, fitness, average), 6);
+        }
+
+        private static readonly TokenType[] Template =
+        {
+            TokenType.IDENTIFIER, TokenType.OPERATOR_ASSIGN, TokenType.IDENTIFIER,
+            TokenType.OPERATOR_PLUS, TokenType.IDENTIFIER, TokenType.SEMICOLON
+        };
+
+        [Fact]
+        public void MutateTemplate_WithZeroRates_ReturnsTheTemplateUnchanged()
+        {
+            var random = new System.Random(1);
+            for (int i = 0; i < 100; i++)
+                Assert.Equal(Template, ChainReplicator.MutateTemplate(Template, random, 0, 0));
+        }
+
+        [Fact]
+        public void MutateTemplate_Insertion_DuplicatesARunOfOneOrTwoPositionsInPlace()
+        {
+            var random = new System.Random(2);
+            var lengthsSeen = new System.Collections.Generic.HashSet<int>();
+            for (int i = 0; i < 200; i++)
+            {
+                var result = ChainReplicator.MutateTemplate(Template, random, 1.0, 0);
+                int added = result.Length - Template.Length;
+                Assert.InRange(added, 1, 2);
+                lengthsSeen.Add(added);
+
+                // Some run result[start..start+added) is followed by an identical run, and removing
+                // that second run gives back the template
+                bool matches = Enumerable.Range(0, Template.Length - added + 1).Any(start =>
+                    result.Skip(start).Take(added).SequenceEqual(result.Skip(start + added).Take(added)) &&
+                    result.Take(start + added).Concat(result.Skip(start + 2 * added)).SequenceEqual(Template));
+                Assert.True(matches, string.Join(" ", result));
+            }
+            Assert.Equal(new[] { 1, 2 }, lengthsSeen.OrderBy(x => x));
+        }
+
+        [Fact]
+        public void MutateTemplate_Deletion_RemovesARunOfOneOrTwoPositions()
+        {
+            var random = new System.Random(3);
+            var lengthsSeen = new System.Collections.Generic.HashSet<int>();
+            for (int i = 0; i < 200; i++)
+            {
+                var result = ChainReplicator.MutateTemplate(Template, random, 0, 1.0);
+                int removed = Template.Length - result.Length;
+                Assert.InRange(removed, 1, 2);
+                lengthsSeen.Add(removed);
+
+                bool matches = Enumerable.Range(0, Template.Length - removed + 1).Any(start =>
+                    Template.Take(start).Concat(Template.Skip(start + removed)).SequenceEqual(result));
+                Assert.True(matches, string.Join(" ", result));
+            }
+            Assert.Equal(new[] { 1, 2 }, lengthsSeen.OrderBy(x => x));
+        }
+
+        [Fact]
+        public void MutateTemplate_Deletion_NeverLeavesFewerThanTwoPositions()
+        {
+            var random = new System.Random(4);
+            var three = new[] { TokenType.INTEGER_LITERAL, TokenType.OPERATOR_PLUS, TokenType.INTEGER_LITERAL };
+            var two = new[] { TokenType.OPERATOR_NOT, TokenType.IDENTIFIER };
+            for (int i = 0; i < 100; i++)
+            {
+                Assert.Equal(2, ChainReplicator.MutateTemplate(three, random, 0, 1.0).Length);
+                Assert.Equal(two, ChainReplicator.MutateTemplate(two, random, 0, 1.0));
+            }
+        }
+
+        [Fact]
+        public void TryReplicate_WithInsertion_BuildsLongerValidCopies()
+        {
+            // "5 + 3" with a run duplicated is "5 5 + 3", "5 + + 3", "5 + 3 3", "5 + 5 + 3" or "5 + 3 + 3";
+            // only the last two can bond, so every copy that is made has 5 tokens
+            int copiesMade = 0;
+            for (int seed = 0; seed < 30; seed++)
+            {
+                var (grid, manager, config) = CreateWorld();
+                config.ReplicationInsertionRate = 1.0f;
+                var parent = BuildParent(grid, manager);
+                long id = 10;
+                foreach (var (type, value) in new[] { (TokenType.INTEGER_LITERAL, "1"), (TokenType.INTEGER_LITERAL, "2"),
+                    (TokenType.INTEGER_LITERAL, "4"), (TokenType.OPERATOR_PLUS, "+"), (TokenType.OPERATOR_PLUS, "+") })
+                {
+                    grid.AddToken(MakeToken(id++, type, value, new Vector3Int(6, 5, 0)));
+                }
+
+                var copy = new ChainReplicator(manager, grid, config, new System.Random(seed)).TryReplicate(parent, 1);
+                if (copy == null)
+                    continue;
+
+                copiesMade++;
+                Assert.Equal(5, copy.Tokens.Count);
+                Assert.True(copy.ValidateChain().IsValid);
+            }
+
+            Assert.True(copiesMade > 0);
         }
 
         [Fact]

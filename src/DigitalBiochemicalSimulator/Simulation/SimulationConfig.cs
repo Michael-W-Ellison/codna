@@ -69,6 +69,10 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Probability that a copy takes a token of a different type at one position (copying error)
         public float ReplicationErrorRate { get; set; } = 0.05f;
 
+        // Probability that a copy duplicates a run of 1-2 positions (insertion) or leaves one out (deletion)
+        public float ReplicationInsertionRate { get; set; } = 0.05f;
+        public float ReplicationDeletionRate { get; set; } = 0.05f;
+
         // Fitter chains (ChainFitness) replicate proportionally more often; the average rate stays ReplicationRate
         public bool FitnessWeightedReplication { get; set; } = true;
 
@@ -332,9 +336,11 @@ namespace DigitalBiochemicalSimulator.Simulation
             }
 
             if (ReplicationRate < 0.0f || ReplicationRate > 1.0f ||
-                ReplicationErrorRate < 0.0f || ReplicationErrorRate > 1.0f)
+                ReplicationErrorRate < 0.0f || ReplicationErrorRate > 1.0f ||
+                ReplicationInsertionRate < 0.0f || ReplicationInsertionRate > 1.0f ||
+                ReplicationDeletionRate < 0.0f || ReplicationDeletionRate > 1.0f)
             {
-                errorMessage = "Replication rate and replication error rate must be between 0.0 and 1.0";
+                errorMessage = "Replication rate and replication error, insertion and deletion rates must be between 0.0 and 1.0";
                 return false;
             }
 
