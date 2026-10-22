@@ -130,6 +130,44 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         }
 
         [Fact]
+        public void Engine_CopiesMadeDuringStepsSurviveAndAreRecordedAsDescendants()
+        {
+            var config = SimulationConfig.CreateMinimal();
+            config.ReplicationRate = 1.0f;
+            config.ReplicationErrorRate = 0.0f;
+            config.ValidationFrequency = 1;
+            config.StabilityThreshold = 0;
+            config.MinValidationLength = 3;
+            config.MutationRate = 0;
+            config.VentEmissionRate = 1000; // no vent tokens during the test
+            var simulation = new IntegratedSimulationEngine(config);
+            var parent = BuildParent(simulation.Grid, simulation.BondingManager);
+            simulation.ActiveTokens.AddRange(parent.Tokens);
+
+            // One free token per cell, so they cannot bond to each other on their own
+            foreach (var t in new[]
+            {
+                MakeToken(10, TokenType.INTEGER_LITERAL, "7", new Vector3Int(6, 5, 0)),
+                MakeToken(11, TokenType.OPERATOR_PLUS, "+", new Vector3Int(4, 5, 0)),
+                MakeToken(12, TokenType.INTEGER_LITERAL, "9", new Vector3Int(5, 6, 0))
+            })
+            {
+                simulation.Grid.AddToken(t);
+                simulation.ActiveTokens.Add(t);
+            }
+
+            for (int i = 0; i < 4; i++)
+                simulation.Step();
+
+            Assert.True(simulation.TotalReplications >= 1);
+            var stats = simulation.Analytics.Evolution.GetStatistics();
+            Assert.Equal(1, stats.ReplicatedLineages);
+            var copy = simulation.ChainRegistry.GetAllChains().Single(c => c != parent);
+            Assert.Equal(parent.Tokens.Select(t => t.Type), copy.Tokens.Select(t => t.Type));
+            Assert.Contains(parent.Id, simulation.Analytics.Evolution.GetLineage(copy.Id)!.ParentIds);
+        }
+
+        [Fact]
         public void Engine_DoesNotReplicateChainsThatHaveNotPassedValidation()
         {
             var config = SimulationConfig.CreateMinimal();

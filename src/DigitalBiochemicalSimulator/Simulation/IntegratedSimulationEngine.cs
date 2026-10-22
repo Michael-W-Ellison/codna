@@ -413,11 +413,12 @@ namespace DigitalBiochemicalSimulator.Simulation
             EnforceChainLimit();
             RecordChainDeaths(trackedIds, "ChainLimit", currentTick);
 
-            // Chains that passed validation copy themselves (registered at the next sync)
-            ReplicateChains(currentTick);
-
             // Chains the registry dropped (invalid or over the limit) break apart
             DissolveUntrackedChains(currentTick);
+
+            // Chains that passed validation copy themselves; copies are registered at the next
+            // sync (after the dissolve step above, which would otherwise treat them as dropped)
+            ReplicateChains(currentTick);
         }
 
         /// <summary>
