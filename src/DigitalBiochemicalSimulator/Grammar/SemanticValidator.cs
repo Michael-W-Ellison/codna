@@ -43,11 +43,11 @@ namespace DigitalBiochemicalSimulator.Grammar
             _variableTypes.Clear();
             _declaredVariables.Clear();
 
+            // Validate variable declarations and usage (first, so declared types are known below)
+            ValidateVariableUsage(chain, result);
+
             // Validate type compatibility in expressions
             ValidateTypeCompatibility(chain, result);
-
-            // Validate variable declarations and usage
-            ValidateVariableUsage(chain, result);
 
             // Validate operator usage
             ValidateOperators(chain, result);
@@ -127,7 +127,8 @@ namespace DigitalBiochemicalSimulator.Grammar
                 // Check for variable declarations (e.g., "int x = 5")
                 if (token.Type == TokenType.TYPE_INT ||
                     token.Type == TokenType.TYPE_FLOAT ||
-                    token.Type == TokenType.TYPE_BOOL)
+                    token.Type == TokenType.TYPE_BOOL ||
+                    token.Type == TokenType.TYPE_STRING)
                 {
                     if (i + 1 < chain.Tokens.Count)
                     {
@@ -340,6 +341,14 @@ namespace DigitalBiochemicalSimulator.Grammar
                     return true;
 
                 return false;
+            }
+
+            // Assignment: the value must suit the variable's declared type
+            if (IsAssignmentOperator(operatorToken))
+            {
+                if (leftType == rightType)
+                    return true;
+                return IsNumericType(leftType) && IsNumericType(rightType);
             }
 
             // Logical operators

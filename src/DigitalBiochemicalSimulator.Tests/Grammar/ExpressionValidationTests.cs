@@ -25,7 +25,8 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             ["{"] = TokenType.BRACE_OPEN, ["}"] = TokenType.BRACE_CLOSE, [";"] = TokenType.SEMICOLON,
             ["if"] = TokenType.KEYWORD_IF, ["while"] = TokenType.KEYWORD_WHILE,
             ["return"] = TokenType.KEYWORD_RETURN, ["int"] = TokenType.TYPE_INT,
-            ["true"] = TokenType.KEYWORD_TRUE
+            ["true"] = TokenType.KEYWORD_TRUE, ["string"] = TokenType.TYPE_STRING,
+            ["float"] = TokenType.TYPE_FLOAT
         };
 
         private static TokenChain Parse(string code)
@@ -51,6 +52,8 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
         [InlineData("return x ;")]
         [InlineData("while ( 3 / x - y )")]
         [InlineData("if ( x > 3 ) { y = 1 ; }")]
+        [InlineData("float x = 5 ; x = x * 2 ;")]
+        [InlineData("int x ;")]
         public void ValidCode_PassesSyntaxAndSemantics(string code)
         {
             var chain = Parse(code);
@@ -70,6 +73,12 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
         [InlineData("x = ;")]
         [InlineData("x ; ;")]
         [InlineData("{ x ; }")]
+        [InlineData("int x - 73 * y")]                    // declaration not followed by = or ;
+        [InlineData("float a * 58 - b = c ;")]           // assignment with an expression on its left
+        [InlineData("x = 84 * y = z ;")]                  // second assignment mid-expression
+        [InlineData("x + if ( y )")]                      // if must start a statement
+        [InlineData("x * return y")]                      // return must start a statement
+        [InlineData("5 = x")]                             // assignment to a literal
         public void MalformedCode_FailsSyntax(string code)
         {
             Assert.False(Parse(code).ValidateChain().IsValid);
@@ -78,8 +87,9 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
         [Theory]
         [InlineData("33 * 47 / 0 / 73")]
         [InlineData("x % 0")]
-        [InlineData("5 = x")]
         [InlineData("5 + true")]
+        [InlineData("string x = 5 ;")]
+        [InlineData("int x = true ;")]
         public void MeaninglessCode_PassesSyntaxButFailsSemantics(string code)
         {
             var chain = Parse(code);

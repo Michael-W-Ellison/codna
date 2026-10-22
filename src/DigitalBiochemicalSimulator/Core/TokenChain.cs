@@ -443,12 +443,23 @@ namespace DigitalBiochemicalSimulator.Core
                 var type = Tokens[i].Type;
                 var next = i + 1 < Tokens.Count ? Tokens[i + 1].Type : (TokenType?)null;
                 var previous = i > 0 ? Tokens[i - 1].Type : (TokenType?)null;
+                var beforePrevious = i > 1 ? Tokens[i - 2].Type : (TokenType?)null;
+                bool atStatementStart = IsStatementBoundary(previous);
 
                 if (IsOperandType(type))
                 {
                     if (!expectOperand)
                         return false;
                     expectOperand = false;
+                }
+                else if (IsAssignmentOperatorType(type))
+                {
+                    // A single variable on the left, at the start of a statement or after its declaration:
+                    // "x = 5", "int x = 5"
+                    if (expectOperand || previous != TokenType.IDENTIFIER ||
+                        !(IsStatementBoundary(beforePrevious) || (beforePrevious.HasValue && IsDeclarationKeyword(beforePrevious.Value))))
+                        return false;
+                    expectOperand = true;
                 }
                 else if (IsBinaryOperatorType(type))
                 {
@@ -474,19 +485,22 @@ namespace DigitalBiochemicalSimulator.Core
                 }
                 else if (type == TokenType.KEYWORD_IF || type == TokenType.KEYWORD_WHILE)
                 {
-                    // Must start an expression and be followed by its condition in parentheses
-                    if (!expectOperand || next != TokenType.PAREN_OPEN)
+                    // Starts a statement and is followed by its condition in parentheses
+                    if (!atStatementStart || next != TokenType.PAREN_OPEN)
                         return false;
                 }
                 else if (type == TokenType.KEYWORD_RETURN)
                 {
-                    if (!expectOperand)
+                    if (!atStatementStart)
                         return false;
                 }
                 else if (IsDeclarationKeyword(type))
                 {
-                    // Declarations name a variable: "int x", "var x"
-                    if (!expectOperand || next != TokenType.IDENTIFIER)
+                    // Starts a statement and names a variable, which is then assigned or ends the
+                    // statement: "int x = 5", "int x ;"
+                    var afterName = i + 2 < Tokens.Count ? Tokens[i + 2].Type : (TokenType?)null;
+                    if (!atStatementStart || next != TokenType.IDENTIFIER ||
+                        !(afterName == null || afterName == TokenType.OPERATOR_ASSIGN || afterName == TokenType.SEMICOLON))
                         return false;
                 }
                 else if (type == TokenType.SEMICOLON)
@@ -522,6 +536,26 @@ namespace DigitalBiochemicalSimulator.Core
             return !expectOperand || last == TokenType.SEMICOLON || last == TokenType.BRACE_CLOSE;
         }
 
+        /// <summary>
+        /// True at the start of the chain or after a token that ends a statement or opens/closes a block
+        /// </summary>
+        private static bool IsStatementBoundary(TokenType? previous)
+        {
+            return previous == null ||
+                   previous == TokenType.SEMICOLON ||
+                   previous == TokenType.BRACE_OPEN ||
+                   previous == TokenType.BRACE_CLOSE;
+        }
+
+        private static bool IsAssignmentOperatorType(TokenType type)
+        {
+            return type == TokenType.OPERATOR_ASSIGN ||
+                   type == TokenType.OPERATOR_PLUS_ASSIGN ||
+                   type == TokenType.OPERATOR_MINUS_ASSIGN ||
+                   type == TokenType.OPERATOR_MULTIPLY_ASSIGN ||
+                   type == TokenType.OPERATOR_DIVIDE_ASSIGN;
+        }
+
         private static bool IsOperandType(TokenType type)
         {
             return type == TokenType.INTEGER_LITERAL ||
@@ -542,11 +576,6 @@ namespace DigitalBiochemicalSimulator.Core
                    type == TokenType.OPERATOR_DIVIDE ||
                    type == TokenType.OPERATOR_MODULO ||
                    type == TokenType.OPERATOR_POWER ||
-                   type == TokenType.OPERATOR_ASSIGN ||
-                   type == TokenType.OPERATOR_PLUS_ASSIGN ||
-                   type == TokenType.OPERATOR_MINUS_ASSIGN ||
-                   type == TokenType.OPERATOR_MULTIPLY_ASSIGN ||
-                   type == TokenType.OPERATOR_DIVIDE_ASSIGN ||
                    type == TokenType.OPERATOR_EQUALS ||
                    type == TokenType.OPERATOR_NOT_EQUALS ||
                    type == TokenType.OPERATOR_LESS_THAN ||
