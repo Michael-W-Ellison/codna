@@ -61,8 +61,10 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public bool Equals(Vector3Int other)
             => X == other.X && Y == other.Y && Z == other.Z;
 
+        // A fixed formula (HashCode.Combine is randomized per process), so hash-ordered collections of
+        // positions are enumerated in the same order in every run
         public override int GetHashCode()
-            => HashCode.Combine(X, Y, Z);
+            => unchecked((X * 73856093) ^ (Y * 19349663) ^ (Z * 83492791));
 
         public override string ToString()
             => $"({X}, {Y}, {Z})";
