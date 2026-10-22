@@ -69,6 +69,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Statistics
         public long TotalTokensGenerated { get; private set; }
         public long TotalTokensDestroyed { get; private set; }
+        public long TotalTokensRecycled { get; private set; }
         public long TotalBondsFormed { get; private set; }
         public long TotalBondsBroken { get; private set; }
 
@@ -298,8 +299,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
-                    // Vents stop adding tokens once the population reaches MaxActiveTokens
-                    if (ActiveTokens.Count >= Config.MaxActiveTokens)
+                    // At MaxActiveTokens, vents replace the oldest unbonded token (RecycleIdleTokens)
+                    // or stop adding tokens
+                    if (ActiveTokens.Count >= Config.MaxActiveTokens &&
+                        !(Config.RecycleIdleTokens && RecycleOldestFreeToken()))
                     {
                         TokenPool.ReleaseToken(token);
                         continue;
@@ -310,6 +313,26 @@ namespace DigitalBiochemicalSimulator.Simulation
                     TotalTokensGenerated++;
                 }
             }
+        }
+
+        /// <summary>
+        /// Removes the oldest token that is not bonded, preferring resting tokens (no energy).
+        /// Returns false when every token is bonded.
+        /// </summary>
+        private bool RecycleOldestFreeToken()
+        {
+            // ActiveTokens is in the order tokens were generated, so the first match is the oldest
+            var token = ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0 && t.Energy == 0)
+                        ?? ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0);
+            if (token == null)
+                return false;
+
+            Grid.RemoveToken(token);
+            ActiveTokens.Remove(token);
+            TokenPool.ReleaseToken(token);
+            TotalTokensDestroyed++;
+            TotalTokensRecycled++;
+            return true;
         }
 
         /// <summary>
@@ -437,8 +460,10 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Validates chains that have reached MinValidationLength and have not bonded for
-        /// StabilityThreshold ticks; chains that fail validation are removed from the registry
+        /// Validates chains that have reached MinValidationLength and either have not bonded for
+        /// StabilityThreshold ticks or, while still bonding, have gone StabilityThreshold ticks since
+        /// they formed or were last validated (so a chain cannot avoid validation by growing).
+        /// Chains that fail validation are removed from the registry.
         /// </summary>
         internal void ValidateChains(long currentTick)
         {
@@ -447,9 +472,12 @@ namespace DigitalBiochemicalSimulator.Simulation
                 if (chain.Length < Config.MinValidationLength)
                     continue;
 
-                if (currentTick - chain.LastModifiedTick < Config.StabilityThreshold)
+                bool settled = currentTick - chain.LastModifiedTick >= Config.StabilityThreshold;
+                bool dueWhileBonding = currentTick - (chain.LastValidatedTick ?? chain.CreatedAt) >= Config.StabilityThreshold;
+                if (!settled && !dueWhileBonding)
                     continue;
 
+                chain.LastValidatedTick = currentTick;
                 if (!chain.ValidateChain().IsValid)
                     ChainRegistry.RemoveChain(chain.Id);
             }
@@ -625,6 +653,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             // Reset counters
             TotalTokensGenerated = 0;
             TotalTokensDestroyed = 0;
+            TotalTokensRecycled = 0;
             TotalBondsFormed = 0;
             TotalBondsBroken = 0;
         }
@@ -894,6 +923,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (configState.StabilityThreshold.HasValue) config.StabilityThreshold = configState.StabilityThreshold.Value;
             if (configState.ValidationFrequency.HasValue) config.ValidationFrequency = configState.ValidationFrequency.Value;
             if (configState.MaxChains.HasValue) config.MaxChains = configState.MaxChains.Value;
+            if (configState.RecycleIdleTokens.HasValue) config.RecycleIdleTokens = configState.RecycleIdleTokens.Value;
             if (configState.TokenDistribution.HasValue) config.TokenDistribution = configState.TokenDistribution.Value;
             if (configState.VentPosition != null)
                 config.VentPosition = new Vector3Int(configState.VentPosition.X, configState.VentPosition.Y, configState.VentPosition.Z);

@@ -108,6 +108,61 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         }
 
         [Fact]
+        public void Bonding_UsesEndAndStartSites_SoChainsStayLinear()
+        {
+            var config = new SimulationConfig(10, 10, 10);
+            var grid = new Grid(10, 10, 10);
+            var rulesEngine = new BondRulesEngine(GrammarLibrary.GetDefaultGrammar());
+            var manager = new BondingManager(rulesEngine, new BondStrengthCalculator(rulesEngine), config, grid);
+            var five = MakeToken(1, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
+            var plus = MakeToken(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
+            var three = MakeToken(3, TokenType.INTEGER_LITERAL, "3", Vector3Int.Zero);
+            var seven = MakeToken(4, TokenType.INTEGER_LITERAL, "7", Vector3Int.Zero);
+
+            Assert.True(manager.AttemptBond(five, plus, 0));    // 5.END - +.START
+            Assert.True(manager.AttemptBond(plus, three, 0));   // +.END - 3.START
+            Assert.False(manager.AttemptBond(plus, seven, 0));  // + has no free END site
+            Assert.False(manager.AttemptBond(seven, plus, 0));  // + has no free START site
+
+            var chain = manager.GetTokenChain(five);
+            Assert.NotNull(chain);
+            Assert.Equal("5 + 3", chain.ToCodeString());
+        }
+
+        [Fact]
+        public void Overflow_SpreadsPilesBeyondNeighborCapacity()
+        {
+            var config = new SimulationConfig(10, 10, 10);
+            var grid = new Grid(10, 10, 10, cellCapacity: 2);
+            var gravity = new GravitySimulator(config, grid);
+            for (int i = 0; i < 40; i++)
+                grid.AddToken(MakeToken(i, TokenType.IDENTIFIER, "x", new Vector3Int(5, 5, 0)));
+
+            for (int i = 0; i < 20; i++)
+                gravity.HandleOverflow();
+
+            var counts = grid.GetAllTokens().GroupBy(t => t.Position).Select(g => g.Count()).ToList();
+            Assert.Equal(40, counts.Sum());
+            Assert.True(counts.Max() <= 3, $"Largest pile still holds {counts.Max()} tokens");
+        }
+
+        [Fact]
+        public void BondRulesEngine_AddRule_UpdatesCachedBondResults()
+        {
+            var rulesEngine = new BondRulesEngine(new List<GrammarRule>());
+            var a = MakeToken(1, TokenType.IDENTIFIER, "a", Vector3Int.Zero);
+            var b = MakeToken(2, TokenType.IDENTIFIER, "b", Vector3Int.Zero);
+            Assert.False(rulesEngine.CanBond(a, b));
+
+            var rule = new GrammarRule("pair", "identifier pair");
+            rule.Pattern.Add(new TokenPattern(TokenType.IDENTIFIER));
+            rule.Pattern.Add(new TokenPattern(TokenType.IDENTIFIER));
+            rulesEngine.AddRule(rule);
+
+            Assert.True(rulesEngine.CanBond(a, b));
+        }
+
+        [Fact]
         public void Gravity_FallingTokenWithOpenSpaceBelow_DoesNotDriftSideways()
         {
             var config = new SimulationConfig(10, 10, 10);
@@ -158,18 +213,88 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
         }
 
         [Fact]
-        public void Vents_StopEmittingAtMaxActiveTokens()
+        public void Vents_StopEmittingAtMaxActiveTokens_WhenRecyclingIsOff()
         {
             var config = SimulationConfig.CreateMinimal();
             config.MaxActiveTokens = 5;
             config.VentEmissionRate = 1;
             config.TokenGenerationRate = 10;
+            config.RecycleIdleTokens = false;
             var simulation = new IntegratedSimulationEngine(config);
 
             for (int i = 0; i < 20; i++)
                 simulation.Step();
 
             Assert.True(simulation.ActiveTokens.Count <= 5);
+            Assert.Equal(5, simulation.TotalTokensGenerated);
+            Assert.Equal(0, simulation.TotalTokensRecycled);
+        }
+
+        [Fact]
+        public void Vents_RecycleOldestFreeTokensAtMaxActiveTokens()
+        {
+            var config = SimulationConfig.CreateMinimal();
+            config.MaxActiveTokens = 5;
+            config.VentEmissionRate = 1;
+            config.RecycleIdleTokens = true;
+            var simulation = new IntegratedSimulationEngine(config);
+
+            for (int i = 0; i < 20; i++)
+                simulation.Step();
+
+            Assert.True(simulation.ActiveTokens.Count <= 5);
+            Assert.True(simulation.TotalTokensGenerated > 5);
+            Assert.True(simulation.TotalTokensRecycled > 0);
+        }
+
+        [Fact]
+        public void Recycling_NeverRemovesBondedTokens()
+        {
+            var config = SimulationConfig.CreateMinimal();
+            config.MaxActiveTokens = 2;
+            config.VentEmissionRate = 1;
+            config.ValidationFrequency = 0;
+            config.RecycleIdleTokens = true;
+            var simulation = new IntegratedSimulationEngine(config);
+            var token1 = MakeToken(1001, TokenType.INTEGER_LITERAL, "5", new Vector3Int(1, 1, 0));
+            var token2 = MakeToken(1002, TokenType.OPERATOR_PLUS, "+", new Vector3Int(1, 1, 0));
+            simulation.Grid.AddToken(token1);
+            simulation.Grid.AddToken(token2);
+            simulation.ActiveTokens.Add(token1);
+            simulation.ActiveTokens.Add(token2);
+            Assert.True(simulation.BondingManager.AttemptBond(token1, token2, 0));
+
+            for (int i = 0; i < 10; i++)
+                simulation.Step();
+
+            Assert.Contains(token1, simulation.ActiveTokens);
+            Assert.Contains(token2, simulation.ActiveTokens);
+            Assert.Equal(0, simulation.TotalTokensRecycled);
+        }
+
+        [Theory]
+        [InlineData(5, false)]  // bonding, and not yet StabilityThreshold ticks since it formed
+        [InlineData(10, true)]  // still bonding, but due: validated and dissolved
+        public void Validation_ChecksChainsThatKeepBonding(long currentTick, bool expectDissolved)
+        {
+            var config = SimulationConfig.CreateMinimal();
+            config.MinValidationLength = 3;
+            config.StabilityThreshold = 10;
+            var simulation = new IntegratedSimulationEngine(config);
+            var token1 = MakeToken(1001, TokenType.INTEGER_LITERAL, "5", new Vector3Int(1, 1, 0));
+            var token2 = MakeToken(1002, TokenType.OPERATOR_PLUS, "+", new Vector3Int(1, 1, 0));
+            var token3 = MakeToken(1003, TokenType.INTEGER_LITERAL, "3", new Vector3Int(1, 1, 0));
+            Assert.True(simulation.BondingManager.AttemptBond(token1, token2, 0));
+            Assert.True(simulation.BondingManager.AttemptBond(token2, token3, 0));
+            var chain = simulation.BondingManager.GetTokenChain(token1)!;
+            simulation.ChainRegistry.RegisterChain(chain);
+            chain.Tokens.Reverse(0, 2); // an unbonded pair makes the chain invalid
+
+            // The chain bonded on this very tick, so it never settles
+            chain.LastModifiedTick = currentTick;
+            simulation.ValidateChains(currentTick);
+
+            Assert.Equal(expectDissolved, simulation.ChainRegistry.GetChain(chain.Id) != chain);
         }
 
         [Fact]

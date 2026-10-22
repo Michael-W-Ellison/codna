@@ -51,25 +51,32 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (token1.BondedTokens.Contains(token2) || token2.BondedTokens.Contains(token1))
                 return false;
 
-            // Step 1: Check grammar compatibility
+            // Step 1: Find free bond sites: token1 bonds at its END to token2's START, so each token
+            // bonds at most once on each side and chains stay linear (design spec section 3.4.3)
+            var endSite = token1.GetBondSite(BondLocation.END);
+            var startSite = token2.GetBondSite(BondLocation.START);
+            if (endSite == null || endSite.IsOccupied || startSite == null || startSite.IsOccupied)
+                return false;
+
+            // Step 2: Check grammar compatibility (token1 precedes token2)
             if (!_rulesEngine.CanBond(token1, token2))
                 return false;
 
-            // Step 2: Calculate bond strength
+            // Step 3: Calculate bond strength
             float bondStrength = _strengthCalculator.CalculateBondStrength(token1, token2);
             if (bondStrength < _config.MinBondStrength)
                 return false;
 
-            // Step 3: Determine bond type
+            // Step 4: Determine bond type
             BondType bondType = _strengthCalculator.DetermineBondType(token1, token2);
 
-            // Step 4: Create the bond (bonding needs no energy; design spec section 3.4.3)
+            // Step 5: Create the bond (bonding needs no energy; design spec section 3.4.3)
             CreateBond(token1, token2, bondType, bondStrength);
 
-            // Step 5: Update or create chains
+            // Step 6: Update or create chains
             UpdateChains(token1, token2, bondType, bondStrength, currentTick);
 
-            // Step 6: Generate bonding energy: (chain length - 1) * EnergyPerBond
+            // Step 7: Generate bonding energy: (chain length - 1) * EnergyPerBond
             DistributeEnergyToChain(token1, _config.EnergyPerBond);
 
             return true;
@@ -93,21 +100,9 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// </summary>
         private void UpdateBondSites(Token token1, Token token2, BondType bondType)
         {
-            // Find an available bond site on token1
-            var site1 = token1.BondSites.FirstOrDefault(s => !s.IsOccupied);
-            if (site1 != null)
-            {
-                site1.IsOccupied = true;
-                site1.BondedTo = token2;
-            }
-
-            // Find an available bond site on token2
-            var site2 = token2.BondSites.FirstOrDefault(s => !s.IsOccupied);
-            if (site2 != null)
-            {
-                site2.IsOccupied = true;
-                site2.BondedTo = token1;
-            }
+            // token1's END site holds token2; token2's START site holds token1
+            token1.GetBondSite(BondLocation.END)?.FormBond(token2, _strengthCalculator.CalculateBondStrength(token1, token2));
+            token2.GetBondSite(BondLocation.START)?.FormBond(token1, _strengthCalculator.CalculateBondStrength(token1, token2));
         }
 
         /// <summary>
@@ -203,8 +198,11 @@ namespace DigitalBiochemicalSimulator.Chemistry
         {
             var component = CollectConnectedTokens(start);
 
-            // Start from an end of the chain (a token with at most one bond), keeping the current head if it is one
-            var head = component.FirstOrDefault(t => t == chain.Head && t.BondedTokens.Count <= 1)
+            // Start from the first token of the chain: the one with no token bonded at its START site
+            // (tokens bonded without sites fall back to any end of the chain)
+            var head = component.FirstOrDefault(t => t.BondedTokens.Count > 0 && t.GetBondSite(BondLocation.START) is { IsOccupied: false }
+                                                     && t.GetBondSite(BondLocation.END) is { IsOccupied: true })
+                       ?? component.FirstOrDefault(t => t == chain.Head && t.BondedTokens.Count <= 1)
                        ?? component.FirstOrDefault(t => t.BondedTokens.Count <= 1)
                        ?? start;
 

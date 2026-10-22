@@ -55,6 +55,10 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Performance Configuration
         public int MaxActiveTokens { get; set; } = 1000;
         public int MaxChains { get; set; } = 200;
+
+        // At MaxActiveTokens, vents replace the oldest unbonded token instead of stopping,
+        // so new material keeps arriving
+        public bool RecycleIdleTokens { get; set; } = true;
         public int TicksPerSecond { get; set; } = 10;
         public int TickDuration => TicksPerSecond > 0 ? 1000 / TicksPerSecond : 1000;  // milliseconds, from TicksPerSecond
 

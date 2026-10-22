@@ -101,24 +101,23 @@ namespace DigitalBiochemicalSimulator.Physics
             // Get tokens to redistribute (prioritize falling tokens)
             var tokensToMove = cell.GetRedistributableTokens();
 
-            // Sort neighbors by lowest mass first (ties in random order, so overflow does not drift one way)
-            var sortedNeighbors = neighbors.OrderBy(c => c.TotalMass).ThenBy(_ => _random.Next()).ToList();
-
             foreach (var token in tokensToMove)
             {
                 // Stop if cell is no longer overflowing
                 if (!cell.IsOverflowing)
                     break;
 
-                // Find first neighbor that can accept token
-                foreach (var neighbor in sortedNeighbors)
-                {
-                    if (neighbor.CanAcceptToken(token))
-                    {
-                        _grid.MoveToken(token, neighbor.Position);
-                        break;
-                    }
-                }
+                // Lowest mass neighbor first (ties in random order, so overflow does not drift one way).
+                // A neighbor takes the token if it has room, or if it would still be no heavier than
+                // this cell afterwards, so piles spread outward instead of staying in one cell.
+                var target = neighbors
+                    .OrderBy(c => c.TotalMass)
+                    .ThenBy(_ => _random.Next())
+                    .FirstOrDefault(n => n.CanAcceptToken(token) ||
+                                         n.TotalMass + token.Mass <= cell.TotalMass - token.Mass);
+
+                if (target == null || !_grid.MoveToken(token, target.Position, allowOverflow: true))
+                    break;
             }
         }
 

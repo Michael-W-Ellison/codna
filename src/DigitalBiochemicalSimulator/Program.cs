@@ -826,6 +826,10 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 10 and 1000[/]")
                         .Validate(v => v >= 10 && v <= 1000));
 
+                config.RecycleIdleTokens = AnsiConsole.Confirm(
+                    "[cyan]Recycle the oldest unbonded tokens when the token limit is reached (keeps new tokens arriving)?[/]",
+                    config.RecycleIdleTokens);
+
                 config.TicksPerSecond = AnsiConsole.Prompt(
                     new TextPrompt<int>("[cyan]Ticks Per Second:[/]")
                         .DefaultValue(config.TicksPerSecond)

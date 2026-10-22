@@ -103,6 +103,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int? StabilityThreshold { get; set; }
         public int? ValidationFrequency { get; set; }
         public int? MaxChains { get; set; }
+        public bool? RecycleIdleTokens { get; set; }
         public TokenDistributionProfile? TokenDistribution { get; set; }
         public Vector3IntState? VentPosition { get; set; }
 
@@ -153,6 +154,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 StabilityThreshold = config.StabilityThreshold,
                 ValidationFrequency = config.ValidationFrequency,
                 MaxChains = config.MaxChains,
+                RecycleIdleTokens = config.RecycleIdleTokens,
                 TokenDistribution = config.TokenDistribution,
                 VentPosition = new Vector3IntState { X = config.VentPosition.X, Y = config.VentPosition.Y, Z = config.VentPosition.Z }
             };

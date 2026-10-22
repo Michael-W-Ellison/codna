@@ -14,6 +14,9 @@ namespace DigitalBiochemicalSimulator.Chemistry
         private readonly List<GrammarRule> _grammarRules;
         private readonly Dictionary<string, GrammarRule> _ruleIndex;
 
+        // CanBond depends only on the two token types, so results are cached per type pair
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<(TokenType, TokenType), bool> _canBondCache = new();
+
         public BondRulesEngine(List<GrammarRule> grammarRules)
         {
             _grammarRules = grammarRules ?? new List<GrammarRule>();
@@ -41,15 +44,8 @@ namespace DigitalBiochemicalSimulator.Chemistry
                 return false;
 
             // Check if any grammar rule allows this bond
-            foreach (var rule in _grammarRules)
-            {
-                if (rule.CanBond(token1, token2))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return _canBondCache.GetOrAdd((token1.Type, token2.Type),
+                _ => _grammarRules.Any(rule => rule.CanBond(token1, token2)));
         }
 
         /// <summary>
@@ -205,6 +201,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (!_ruleIndex.ContainsKey(rule.Id))
             {
                 _grammarRules.Add(rule);
+                _canBondCache.Clear();
                 _ruleIndex[rule.Id] = rule;
             }
         }
@@ -217,6 +214,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (_ruleIndex.TryGetValue(id, out var rule))
             {
                 _grammarRules.Remove(rule);
+                _canBondCache.Clear();
                 _ruleIndex.Remove(id);
                 return true;
             }

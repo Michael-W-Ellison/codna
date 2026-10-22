@@ -301,6 +301,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             config.MutationFalloff = MutationFalloff.Abrupt;
             config.MaxChains = 7;
             config.ValidationFrequency = 3;
+            config.RecycleIdleTokens = false;
             var simulation = new IntegratedSimulationEngine(config);
 
             var restored = IntegratedSimulationEngine.RestoreFromState(simulation.CaptureState());
@@ -313,6 +314,7 @@ namespace DigitalBiochemicalSimulator.Tests.Simulation
             Assert.Equal(MutationFalloff.Abrupt, restored.Config.MutationFalloff);
             Assert.Equal(7, restored.Config.MaxChains);
             Assert.Equal(3, restored.Config.ValidationFrequency);
+            Assert.False(restored.Config.RecycleIdleTokens);
         }
     }
 }

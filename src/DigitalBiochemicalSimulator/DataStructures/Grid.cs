@@ -146,7 +146,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// <summary>
         /// Moves a token from one position to another (thread-safe)
         /// </summary>
-        public bool MoveToken(Token token, Vector3Int newPosition)
+        /// <param name="allowOverflow">Move even if the destination is at capacity
+        /// (used when spreading overflow from a heavier cell)</param>
+        public bool MoveToken(Token token, Vector3Int newPosition, bool allowOverflow = false)
         {
             if (token == null)
                 return false;
@@ -161,7 +163,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
                 var newCell = _cells[newPosition.X, newPosition.Y, newPosition.Z];
 
                 // Check if new cell can accept the token
-                if (!newCell.CanAcceptToken(token))
+                if (!allowOverflow && !newCell.CanAcceptToken(token))
                     return false;
 
                 // Move the token

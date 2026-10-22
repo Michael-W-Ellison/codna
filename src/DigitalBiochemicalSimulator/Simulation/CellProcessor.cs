@@ -53,8 +53,9 @@ namespace DigitalBiochemicalSimulator.Simulation
                     if (token1.BondedTokens.Contains(token2))
                         continue;
 
-                    // Attempt to bond
-                    if (_bondingManager.AttemptBond(token1, token2, currentTick))
+                    // Attempt to bond (either token can come first)
+                    if (_bondingManager.AttemptBond(token1, token2, currentTick) ||
+                        _bondingManager.AttemptBond(token2, token1, currentTick))
                     {
                         bondsFormed++;
                     }
@@ -92,7 +93,8 @@ namespace DigitalBiochemicalSimulator.Simulation
                     if (partner.Id <= token.Id || token.BondedTokens.Contains(partner))
                         continue;
 
-                    if (_bondingManager.AttemptBond(token, partner, currentTick))
+                    if (_bondingManager.AttemptBond(token, partner, currentTick) ||
+                        _bondingManager.AttemptBond(partner, token, currentTick))
                     {
                         bondsFormed++;
                     }
