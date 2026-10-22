@@ -502,6 +502,7 @@ namespace DigitalBiochemicalSimulator
                         "Damage & Mutation Parameters",
                         "Thermal Vents & Token Distribution",
                         "Validation & Chain Stability",
+                        "Replication (Inheritance)",
                         "Performance Limits"
                     }));
 
@@ -807,6 +808,33 @@ namespace DigitalBiochemicalSimulator
                         .Validate(v => v >= 1 && v <= 50));
 
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Validation & stability configured");
+            }
+
+            // Customize Replication (Inheritance)
+            if (categories.Contains("Replication (Inheritance)"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Replication (Inheritance) ═══[/]");
+                AnsiConsole.MarkupLine("[dim]Chains that pass validation copy themselves from free tokens nearby[/]\n");
+
+                config.ReplicationRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Rate (chance per tick for each eligible chain, 0 = off):[/]")
+                        .DefaultValue(config.ReplicationRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.ReplicationRange = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Replication Range (cells to gather free tokens from):[/]")
+                        .DefaultValue(config.ReplicationRange)
+                        .ValidationErrorMessage("[red]Must be between 0 and 10[/]")
+                        .Validate(v => v >= 0 && v <= 10));
+
+                config.ReplicationErrorRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Error Rate (chance a copy has a different token type at one position):[/]")
+                        .DefaultValue(config.ReplicationErrorRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Replication configured");
             }
 
             // Customize Performance Limits

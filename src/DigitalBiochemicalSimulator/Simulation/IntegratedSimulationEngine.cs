@@ -62,6 +62,12 @@ namespace DigitalBiochemicalSimulator.Simulation
         private List<ComprehensiveAnalysisResult> _latestAnalysis;
         private readonly object _analysisLock = new object();
         private readonly SemanticValidator _semanticValidator = new SemanticValidator();
+        private readonly Random _random = new Random();
+        private readonly Dictionary<long, long> _pendingParentIds = new Dictionary<long, long>(); // copy chain ID -> parent chain ID
+
+        // Replication
+        public ChainReplicator ChainReplicator { get; private set; }
+        public long TotalReplications { get; private set; }
 
         // State
         public List<Token> ActiveTokens { get; private set; }
@@ -95,7 +101,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             nameof(CollisionDetector), nameof(BondRulesEngine), nameof(BondStrengthCalculator),
             nameof(BondingManager), nameof(RepulsionHandler), nameof(ChainStabilityCalculator),
             nameof(ChainRegistry), nameof(DamageSystem), nameof(CellProcessor), nameof(Statistics),
-            nameof(Analytics), nameof(ChainAnalyzer), nameof(_latestAnalysis), nameof(ActiveTokens))]
+            nameof(Analytics), nameof(ChainAnalyzer), nameof(_latestAnalysis), nameof(ActiveTokens),
+            nameof(ChainReplicator))]
         private void InitializeSystems()
         {
             // Core systems
@@ -128,6 +135,7 @@ namespace DigitalBiochemicalSimulator.Simulation
 
             // Integration systems
             CellProcessor = new CellProcessor(BondingManager, RepulsionHandler, Config, Grid);
+            ChainReplicator = new ChainReplicator(BondingManager, Grid, Config);
 
             // Initialize thermal vents
             ThermalVents = new List<ThermalVent>();
@@ -405,6 +413,9 @@ namespace DigitalBiochemicalSimulator.Simulation
             EnforceChainLimit();
             RecordChainDeaths(trackedIds, "ChainLimit", currentTick);
 
+            // Chains that passed validation copy themselves (registered at the next sync)
+            ReplicateChains(currentTick);
+
             // Chains the registry dropped (invalid or over the limit) break apart
             DissolveUntrackedChains(currentTick);
         }
@@ -433,7 +444,36 @@ namespace DigitalBiochemicalSimulator.Simulation
                 if (ChainRegistry.GetChain(chain.Id) != chain)
                 {
                     ChainRegistry.RegisterChain(chain);
-                    Analytics.Evolution.RecordChainFormation(chain, currentTick);
+                    long? parentId = _pendingParentIds.TryGetValue(chain.Id, out var parent) ? parent : null;
+                    Analytics.Evolution.RecordChainFormation(chain, currentTick, parentId);
+                }
+            }
+
+            _pendingParentIds.Clear();
+        }
+
+        /// <summary>
+        /// Each chain that passed validation and is at least StabilityThreshold ticks old copies
+        /// itself with probability ReplicationRate (see ChainReplicator)
+        /// </summary>
+        internal void ReplicateChains(long currentTick)
+        {
+            if (Config.ReplicationRate <= 0.0f)
+                return;
+
+            foreach (var parent in ChainRegistry.GetAllChains())
+            {
+                if (!parent.PassedValidation || currentTick - parent.CreatedAt < Config.StabilityThreshold)
+                    continue;
+
+                if (_random.NextDouble() >= Config.ReplicationRate)
+                    continue;
+
+                var copy = ChainReplicator.TryReplicate(parent, currentTick);
+                if (copy != null)
+                {
+                    _pendingParentIds[copy.Id] = parent.Id;
+                    TotalReplications++;
                 }
             }
         }
@@ -481,6 +521,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                     continue;
 
                 chain.LastValidatedTick = currentTick;
+                chain.PassedValidation = false;
 
                 string? failure = null;
                 if (!chain.ValidateChain().IsValid)
@@ -497,6 +538,10 @@ namespace DigitalBiochemicalSimulator.Simulation
                 {
                     ChainRegistry.RemoveChain(chain.Id);
                     Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, failure);
+                }
+                else
+                {
+                    chain.PassedValidation = true;
                 }
             }
         }
@@ -672,6 +717,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             TotalTokensGenerated = 0;
             TotalTokensDestroyed = 0;
             TotalTokensRecycled = 0;
+            TotalReplications = 0;
+            _pendingParentIds.Clear();
             TotalBondsFormed = 0;
             TotalBondsBroken = 0;
         }
@@ -942,6 +989,9 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (configState.ValidationFrequency.HasValue) config.ValidationFrequency = configState.ValidationFrequency.Value;
             if (configState.MaxChains.HasValue) config.MaxChains = configState.MaxChains.Value;
             if (configState.RecycleIdleTokens.HasValue) config.RecycleIdleTokens = configState.RecycleIdleTokens.Value;
+            if (configState.ReplicationRate.HasValue) config.ReplicationRate = configState.ReplicationRate.Value;
+            if (configState.ReplicationRange.HasValue) config.ReplicationRange = configState.ReplicationRange.Value;
+            if (configState.ReplicationErrorRate.HasValue) config.ReplicationErrorRate = configState.ReplicationErrorRate.Value;
             if (configState.TokenDistribution.HasValue) config.TokenDistribution = configState.TokenDistribution.Value;
             if (configState.VentPosition != null)
                 config.VentPosition = new Vector3Int(configState.VentPosition.X, configState.VentPosition.Y, configState.VentPosition.Z);

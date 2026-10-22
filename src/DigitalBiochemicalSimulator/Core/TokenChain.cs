@@ -21,6 +21,7 @@ namespace DigitalBiochemicalSimulator.Core
         public long LastModifiedAt { get => LastModifiedTick; set => LastModifiedTick = value; } // Alias for compatibility
         public long CreatedAt { get; set; }
         public long? LastValidatedTick { get; set; } // null until the engine first validates the chain
+        public bool PassedValidation { get; set; }   // passed the engine's syntax and semantic checks when last validated
         public bool IsValid { get; set; }
         public BondType BondType { get; set; }
 

@@ -104,6 +104,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int? ValidationFrequency { get; set; }
         public int? MaxChains { get; set; }
         public bool? RecycleIdleTokens { get; set; }
+        public float? ReplicationRate { get; set; }
+        public int? ReplicationRange { get; set; }
+        public float? ReplicationErrorRate { get; set; }
         public TokenDistributionProfile? TokenDistribution { get; set; }
         public Vector3IntState? VentPosition { get; set; }
 
@@ -155,6 +158,9 @@ namespace DigitalBiochemicalSimulator.Simulation
                 ValidationFrequency = config.ValidationFrequency,
                 MaxChains = config.MaxChains,
                 RecycleIdleTokens = config.RecycleIdleTokens,
+                ReplicationRate = config.ReplicationRate,
+                ReplicationRange = config.ReplicationRange,
+                ReplicationErrorRate = config.ReplicationErrorRate,
                 TokenDistribution = config.TokenDistribution,
                 VentPosition = new Vector3IntState { X = config.VentPosition.X, Y = config.VentPosition.Y, Z = config.VentPosition.Z }
             };

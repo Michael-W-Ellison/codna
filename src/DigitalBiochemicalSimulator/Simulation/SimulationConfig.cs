@@ -59,6 +59,15 @@ namespace DigitalBiochemicalSimulator.Simulation
         // At MaxActiveTokens, vents replace the oldest unbonded token instead of stopping,
         // so new material keeps arriving
         public bool RecycleIdleTokens { get; set; } = true;
+
+        // Replication: each tick, a chain that has passed validation and is at least StabilityThreshold
+        // ticks old copies itself with this probability, from free tokens within ReplicationRange cells
+        // (0 disables replication)
+        public float ReplicationRate { get; set; } = 0.05f;
+        public int ReplicationRange { get; set; } = 2;
+
+        // Probability that a copy takes a token of a different type at one position (copying error)
+        public float ReplicationErrorRate { get; set; } = 0.05f;
         public int TicksPerSecond { get; set; } = 10;
         public int TickDuration => TicksPerSecond > 0 ? 1000 / TicksPerSecond : 1000;  // milliseconds, from TicksPerSecond
 
@@ -306,6 +315,19 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (DamageIncrement < 0.0f || DamageIncrement > 1.0f)
             {
                 errorMessage = "Damage increment must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ReplicationRate < 0.0f || ReplicationRate > 1.0f ||
+                ReplicationErrorRate < 0.0f || ReplicationErrorRate > 1.0f)
+            {
+                errorMessage = "Replication rate and replication error rate must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ReplicationRange < 0 || ReplicationRange > 10)
+            {
+                errorMessage = "Replication range must be between 0 and 10";
                 return false;
             }
 
