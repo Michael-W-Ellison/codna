@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
@@ -58,6 +59,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Initializes all simulation systems
         /// </summary>
+        [MemberNotNull(nameof(Grid), nameof(TickManager), nameof(TokenPool), nameof(TokenFactory),
+            nameof(ThermalVents), nameof(EnergyManager), nameof(MotionController), nameof(GravitySimulator),
+            nameof(CollisionDetector), nameof(ActiveTokens))]
         private void InitializeSystems()
         {
             // Core systems
@@ -97,7 +101,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 var position = GetVentPosition(i);
                 var vent = new ThermalVent(position, TokenFactory,
-                    Config.VentEmissionRate, Config.InitialTokenEnergy);
+                    Config.VentEmissionRate, Config.InitialTokenEnergy)
+                {
+                    TokensPerEmission = Config.TokenGenerationRate
+                };
 
                 // Set distribution based on config
                 if (Config.TokenDistribution == TokenDistributionProfile.ExpressionHeavy)
@@ -212,9 +219,15 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             foreach (var vent in ThermalVents)
             {
-                var token = vent.GenerateToken(TickManager.CurrentTick);
-                if (token != null)
+                foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
+                    // Vents stop adding tokens once the population reaches MaxActiveTokens
+                    if (ActiveTokens.Count >= Config.MaxActiveTokens)
+                    {
+                        TokenPool.ReleaseToken(token);
+                        continue;
+                    }
+
                     Grid.AddToken(token);
                     ActiveTokens.Add(token);
                     TotalTokensGenerated++;

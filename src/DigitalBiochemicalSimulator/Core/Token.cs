@@ -26,6 +26,9 @@ namespace DigitalBiochemicalSimulator.Core
         public List<BondSite> BondSites { get; set; }
         public List<Token> BondedTokens { get; set; }
         public Token? ChainHead { get; set; }
+        public long ChainId { get; set; } // 0 when not in a chain
+        public long ReservedBy { get; set; } // ID of the copy in progress holding this token (0 = not reserved)
+        public bool IsReserved => ReservedBy != 0;
         public int ChainPosition { get; set; }
 
         // Metadata (subject to damage)
@@ -58,6 +61,8 @@ namespace DigitalBiochemicalSimulator.Core
             BondSites = new List<BondSite>();
             BondedTokens = new List<Token>();
             ChainHead = null;
+            ChainId = 0;
+            ReservedBy = 0;
             ChainPosition = 0;
 
             Metadata = new TokenMetadata();

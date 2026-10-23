@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
@@ -14,6 +15,7 @@ namespace DigitalBiochemicalSimulator.Physics
     {
         private SimulationConfig _config;
         private Grid _grid;
+        private readonly Random _random = new Random();
 
         public GravitySimulator(SimulationConfig config, Grid grid)
         {
@@ -60,19 +62,26 @@ namespace DigitalBiochemicalSimulator.Physics
             if (currentCell == null)
                 return;
 
-            // Get neighbors (8 horizontal + 1 below)
-            var neighbors = _grid.GetNeighbors(token.Position);
-            if (neighbors.Count == 0)
+            // Seek the lowest available position: if the cell below can take the token,
+            // it falls straight down (MotionController moves it)
+            var below = _grid.GetCell(token.Position + new Vector3Int(0, 0, -1));
+            if (below == null || below.CanAcceptToken(token))
                 return;
 
-            // Find lowest mass neighbor
-            var lowestNeighbor = neighbors.OrderBy(c => c.TotalMass).First();
+            // Blocked below: slide to a horizontal neighbor that has room and open space beneath it,
+            // chosen at random so tokens do not drift in one direction
+            var candidates = _grid.GetNeighbors(token.Position)
+                .Where(c => c.Position.Z == token.Position.Z && c.CanAcceptToken(token))
+                .Where(c =>
+                {
+                    var beneath = _grid.GetCell(c.Position + new Vector3Int(0, 0, -1));
+                    return beneath != null && beneath.CanAcceptToken(token);
+                })
+                .ToList();
 
-            // If lowest neighbor has less mass and can accept token, move there
-            if (lowestNeighbor.TotalMass < currentCell.TotalMass &&
-                lowestNeighbor.CanAcceptToken(token))
+            if (candidates.Count > 0)
             {
-                _grid.MoveToken(token, lowestNeighbor.Position);
+                _grid.MoveToken(token, candidates[_random.Next(candidates.Count)].Position);
             }
         }
 
@@ -92,24 +101,23 @@ namespace DigitalBiochemicalSimulator.Physics
             // Get tokens to redistribute (prioritize falling tokens)
             var tokensToMove = cell.GetRedistributableTokens();
 
-            // Sort neighbors by lowest mass first
-            var sortedNeighbors = neighbors.OrderBy(c => c.TotalMass).ToList();
-
             foreach (var token in tokensToMove)
             {
                 // Stop if cell is no longer overflowing
                 if (!cell.IsOverflowing)
                     break;
 
-                // Find first neighbor that can accept token
-                foreach (var neighbor in sortedNeighbors)
-                {
-                    if (neighbor.CanAcceptToken(token))
-                    {
-                        _grid.MoveToken(token, neighbor.Position);
-                        break;
-                    }
-                }
+                // Lowest mass neighbor first (ties in random order, so overflow does not drift one way).
+                // A neighbor takes the token if it has room, or if it would still be no heavier than
+                // this cell afterwards, so piles spread outward instead of staying in one cell.
+                var target = neighbors
+                    .OrderBy(c => c.TotalMass)
+                    .ThenBy(_ => _random.Next())
+                    .FirstOrDefault(n => n.CanAcceptToken(token) ||
+                                         n.TotalMass + token.Mass <= cell.TotalMass - token.Mass);
+
+                if (target == null || !_grid.MoveToken(token, target.Position, allowOverflow: true))
+                    break;
             }
         }
 

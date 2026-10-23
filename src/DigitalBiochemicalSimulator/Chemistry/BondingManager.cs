@@ -43,6 +43,10 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (!token1.IsActive || !token2.IsActive)
                 return false;
 
+            // Tokens reserved for a copy in progress bond only when that copy is assembled
+            if (token1.IsReserved || token2.IsReserved)
+                return false;
+
             // Prevent self-bonding
             if (token1.Id == token2.Id)
                 return false;
@@ -51,41 +55,33 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (token1.BondedTokens.Contains(token2) || token2.BondedTokens.Contains(token1))
                 return false;
 
-            // Step 1: Check grammar compatibility
+            // Step 1: Find free bond sites: token1 bonds at its END to token2's START, so each token
+            // bonds at most once on each side and chains stay linear (design spec section 3.4.3)
+            var endSite = token1.GetBondSite(BondLocation.END);
+            var startSite = token2.GetBondSite(BondLocation.START);
+            if (endSite == null || endSite.IsOccupied || startSite == null || startSite.IsOccupied)
+                return false;
+
+            // Step 2: Check grammar compatibility (token1 precedes token2)
             if (!_rulesEngine.CanBond(token1, token2))
                 return false;
 
-            // Step 2: Calculate bond strength
+            // Step 3: Calculate bond strength
             float bondStrength = _strengthCalculator.CalculateBondStrength(token1, token2);
-            if (bondStrength < 0.3f) // Minimum threshold
+            if (bondStrength < _config.MinBondStrength)
                 return false;
 
-            // Step 3: Check if bond can actually form
-            if (!_strengthCalculator.CanFormBond(token1, token2))
-                return false;
-
-            // Step 4: Calculate energy cost
-            int energyCost = _strengthCalculator.CalculateBondEnergyCost(token1, token2);
-            int totalEnergy = token1.Energy + token2.Energy;
-
-            if (totalEnergy < energyCost)
-                return false; // Not enough energy
-
-            // Step 5: Determine bond type
+            // Step 4: Determine bond type
             BondType bondType = _strengthCalculator.DetermineBondType(token1, token2);
 
-            // Step 6: Create the bond
-            CreateBond(token1, token2, bondType, bondStrength, energyCost);
+            // Step 5: Create the bond (bonding needs no energy; design spec section 3.4.3)
+            CreateBond(token1, token2, bondType, bondStrength);
 
-            // Step 7: Update or create chains
+            // Step 6: Update or create chains
             UpdateChains(token1, token2, bondType, bondStrength, currentTick);
 
-            // Step 8: Generate energy from bond formation (exothermic)
-            int energyRelease = _strengthCalculator.CalculateBondEnergyRelease(token1, token2);
-            if (energyRelease > 0)
-            {
-                DistributeEnergyToChain(token1, energyRelease);
-            }
+            // Step 7: Generate bonding energy: (chain length - 1) * EnergyPerBond
+            DistributeEnergyToChain(token1, _config.EnergyPerBond);
 
             return true;
         }
@@ -93,18 +89,11 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Creates a bond between two tokens
         /// </summary>
-        private void CreateBond(Token token1, Token token2, BondType bondType, float strength, int energyCost)
+        private void CreateBond(Token token1, Token token2, BondType bondType, float strength)
         {
             // Add tokens to each other's bonded lists
             token1.BondedTokens.Add(token2);
             token2.BondedTokens.Add(token1);
-
-            // Deduct energy cost (split between both tokens)
-            int cost1 = energyCost / 2;
-            int cost2 = energyCost - cost1;
-
-            token1.Energy = Math.Max(0, token1.Energy - cost1);
-            token2.Energy = Math.Max(0, token2.Energy - cost2);
 
             // Update bond sites (if available)
             UpdateBondSites(token1, token2, bondType);
@@ -115,21 +104,9 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// </summary>
         private void UpdateBondSites(Token token1, Token token2, BondType bondType)
         {
-            // Find an available bond site on token1
-            var site1 = token1.BondSites.FirstOrDefault(s => !s.IsOccupied);
-            if (site1 != null)
-            {
-                site1.IsOccupied = true;
-                site1.BondedTokenId = token2.Id;
-            }
-
-            // Find an available bond site on token2
-            var site2 = token2.BondSites.FirstOrDefault(s => !s.IsOccupied);
-            if (site2 != null)
-            {
-                site2.IsOccupied = true;
-                site2.BondedTokenId = token1.Id;
-            }
+            // token1's END site holds token2; token2's START site holds token1
+            token1.GetBondSite(BondLocation.END)?.FormBond(token2, _strengthCalculator.CalculateBondStrength(token1, token2));
+            token2.GetBondSite(BondLocation.START)?.FormBond(token1, _strengthCalculator.CalculateBondStrength(token1, token2));
         }
 
         /// <summary>
@@ -148,19 +125,24 @@ namespace DigitalBiochemicalSimulator.Chemistry
             else if (chain1 != null && chain2 == null)
             {
                 // Add token2 to chain1
-                AddTokenToChain(chain1, token2);
+                AddTokenToChain(chain1, token2, currentTick);
             }
             else if (chain1 == null && chain2 != null)
             {
                 // Add token1 to chain2
-                AddTokenToChain(chain2, token1);
+                AddTokenToChain(chain2, token1, currentTick);
             }
             else if (chain1 != null && chain2 != null && chain1 != chain2)
             {
                 // Merge two chains
                 MergeChains(chain1, chain2, currentTick);
             }
-            // else: both tokens already in same chain, just update the chain
+            else if (chain1 != null)
+            {
+                // Both tokens already in same chain, just update the chain
+                RefreshChain(chain1, token1);
+                chain1.LastModifiedAt = currentTick;
+            }
         }
 
         /// <summary>
@@ -171,9 +153,6 @@ namespace DigitalBiochemicalSimulator.Chemistry
             var chain = new TokenChain
             {
                 Id = _nextChainId++,
-                Head = head,
-                Tail = tail,
-                Length = 2,
                 BondType = bondType,
                 AverageBondStrength = strength,
                 IsValid = false, // Will be validated later
@@ -182,32 +161,20 @@ namespace DigitalBiochemicalSimulator.Chemistry
                 StabilityScore = 0.5f
             };
 
-            // Mark both tokens as part of this chain
-            head.ChainId = chain.Id;
-            head.ChainHead = head;
-            tail.ChainId = chain.Id;
-            tail.ChainHead = head;
-
+            RefreshChain(chain, head);
             _activeChains.Add(chain);
         }
 
         /// <summary>
         /// Adds a token to an existing chain
         /// </summary>
-        private void AddTokenToChain(TokenChain chain, Token token)
+        private void AddTokenToChain(TokenChain chain, Token token, long currentTick)
         {
             if (chain == null || token == null)
                 return;
 
-            token.ChainId = chain.Id;
-            token.ChainHead = chain.Head;
-
-            // Update chain metadata
-            chain.Length++;
-            chain.Tail = token; // Assume token is added to tail
-
-            // Recalculate average bond strength
-            RecalculateChainStrength(chain);
+            RefreshChain(chain, token);
+            chain.LastModifiedAt = currentTick;
         }
 
         /// <summary>
@@ -218,48 +185,105 @@ namespace DigitalBiochemicalSimulator.Chemistry
             if (chain1 == null || chain2 == null || chain1 == chain2)
                 return;
 
-            // Merge chain2 into chain1
-            chain1.Length += chain2.Length;
-            chain1.Tail = chain2.Tail;
-            chain1.LastModifiedAt = currentTick;
-
-            // Update all tokens in chain2 to point to chain1
-            UpdateChainReferences(chain2.Head, chain1);
-
-            // Remove chain2 from active chains
+            // Remove chain2 from active chains; its tokens now belong to chain1
             _activeChains.Remove(chain2);
 
-            // Recalculate merged chain strength
-            RecalculateChainStrength(chain1);
+            var start = chain1.Head ?? chain2.Head;
+            if (start != null)
+                RefreshChain(chain1, start);
+            chain1.LastModifiedAt = currentTick;
         }
 
         /// <summary>
-        /// Updates chain references for all tokens in a chain
+        /// Rebuilds a chain's ordered token list and derived properties from the bond graph,
+        /// and points every token in the chain at it
         /// </summary>
-        private void UpdateChainReferences(Token head, TokenChain newChain)
+        private void RefreshChain(TokenChain chain, Token start)
         {
+            var component = CollectConnectedTokens(start);
+
+            // Start from the first token of the chain: the one with no token bonded at its START site
+            // (tokens bonded without sites fall back to any end of the chain)
+            var head = component.FirstOrDefault(t => t.BondedTokens.Count > 0 && t.GetBondSite(BondLocation.START) is { IsOccupied: false }
+                                                     && t.GetBondSite(BondLocation.END) is { IsOccupied: true })
+                       ?? component.FirstOrDefault(t => t == chain.Head && t.BondedTokens.Count <= 1)
+                       ?? component.FirstOrDefault(t => t.BondedTokens.Count <= 1)
+                       ?? start;
+
+            var ordered = new List<Token>();
+            var visited = new HashSet<long>();
+            var stack = new Stack<Token>();
+            stack.Push(head);
+
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                if (!visited.Add(current.Id))
+                    continue;
+
+                ordered.Add(current);
+
+                for (int i = current.BondedTokens.Count - 1; i >= 0; i--)
+                {
+                    var bonded = current.BondedTokens[i];
+                    if (!visited.Contains(bonded.Id))
+                        stack.Push(bonded);
+                }
+            }
+
+            chain.Tokens = ordered;
+            chain.Head = ordered[0];
+            chain.Tail = ordered[ordered.Count - 1];
+            chain.Length = ordered.Count;
+            chain.TotalMass = ordered.Sum(t => t.Mass);
+            chain.TotalEnergy = ordered.Sum(t => t.Energy);
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                ordered[i].ChainId = chain.Id;
+                ordered[i].ChainHead = chain.Head;
+                ordered[i].ChainPosition = i;
+            }
+
+            RecalculateChainStrength(chain);
+        }
+
+        /// <summary>
+        /// Collects all tokens connected to a token through bonds
+        /// </summary>
+        private static List<Token> CollectConnectedTokens(Token start)
+        {
+            var result = new List<Token>();
             var visited = new HashSet<long>();
             var queue = new Queue<Token>();
-            queue.Enqueue(head);
+            queue.Enqueue(start);
 
             while (queue.Count > 0)
             {
                 var current = queue.Dequeue();
-                if (visited.Contains(current.Id))
+                if (!visited.Add(current.Id))
                     continue;
 
-                visited.Add(current.Id);
-                current.ChainId = newChain.Id;
-                current.ChainHead = newChain.Head;
+                result.Add(current);
 
                 foreach (var bonded in current.BondedTokens)
                 {
                     if (!visited.Contains(bonded.Id))
-                    {
                         queue.Enqueue(bonded);
-                    }
                 }
             }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Clears a token's chain membership
+        /// </summary>
+        private static void ClearChainMembership(Token token)
+        {
+            token.ChainId = 0;
+            token.ChainHead = null;
+            token.ChainPosition = 0;
         }
 
         /// <summary>
@@ -309,11 +333,12 @@ namespace DigitalBiochemicalSimulator.Chemistry
         public void DistributeEnergyToChain(Token token, int energyPerBond)
         {
             var chain = FindChainContaining(token);
-            if (chain == null || chain.Length < 2)
+            if (chain == null || chain.Head == null || chain.Length < 2)
                 return;
 
             int totalEnergy = (chain.Length - 1) * energyPerBond;
             int energyPerToken = totalEnergy / chain.Length;
+            int remainder = totalEnergy % chain.Length; // given one each to the first tokens
 
             // Distribute energy to all tokens in chain
             var visited = new HashSet<long>();
@@ -327,7 +352,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
                     continue;
 
                 visited.Add(current.Id);
-                current.Energy += energyPerToken;
+                current.Energy += energyPerToken + (remainder-- > 0 ? 1 : 0);
 
                 foreach (var bonded in current.BondedTokens)
                 {
@@ -342,32 +367,37 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Breaks a bond between two tokens
         /// </summary>
-        public void BreakBond(Token token1, Token token2, long currentTick)
+        /// <returns>True if the tokens were bonded and the bond was broken</returns>
+        public bool BreakBond(Token token1, Token token2, long currentTick)
         {
             if (token1 == null || token2 == null)
-                return;
+                return false;
+
+            if (!token1.BondedTokens.Contains(token2) && !token2.BondedTokens.Contains(token1))
+                return false;
 
             // Remove bond references
             token1.BondedTokens.Remove(token2);
             token2.BondedTokens.Remove(token1);
 
             // Free bond sites
-            var site1 = token1.BondSites.FirstOrDefault(s => s.BondedTokenId == token2.Id);
+            var site1 = token1.BondSites.FirstOrDefault(s => s.BondedTo == token2);
             if (site1 != null)
             {
                 site1.IsOccupied = false;
-                site1.BondedTokenId = 0;
+                site1.BondedTo = null;
             }
 
-            var site2 = token2.BondSites.FirstOrDefault(s => s.BondedTokenId == token1.Id);
+            var site2 = token2.BondSites.FirstOrDefault(s => s.BondedTo == token1);
             if (site2 != null)
             {
                 site2.IsOccupied = false;
-                site2.BondedTokenId = 0;
+                site2.BondedTo = null;
             }
 
             // Update chains (may split)
             UpdateChainsAfterBreak(token1, token2, currentTick);
+            return true;
         }
 
         /// <summary>
@@ -375,7 +405,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// </summary>
         private void UpdateChainsAfterBreak(Token token1, Token token2, long currentTick)
         {
-            var chain = FindChainContaining(token1);
+            var chain = FindChainContaining(token1) ?? FindChainContaining(token2);
             if (chain == null)
                 return;
 
@@ -388,9 +418,8 @@ namespace DigitalBiochemicalSimulator.Chemistry
             else
             {
                 // Chain still connected, just update metadata
-                chain.Length = CalculateChainLength(chain.Head);
+                RefreshChain(chain, token1);
                 chain.LastModifiedAt = currentTick;
-                RecalculateChainStrength(chain);
             }
         }
 
@@ -399,31 +428,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// </summary>
         private bool AreConnected(Token token1, Token token2)
         {
-            var visited = new HashSet<long>();
-            var queue = new Queue<Token>();
-            queue.Enqueue(token1);
-
-            while (queue.Count > 0)
-            {
-                var current = queue.Dequeue();
-                if (current.Id == token2.Id)
-                    return true;
-
-                if (visited.Contains(current.Id))
-                    continue;
-
-                visited.Add(current.Id);
-
-                foreach (var bonded in current.BondedTokens)
-                {
-                    if (!visited.Contains(bonded.Id))
-                    {
-                        queue.Enqueue(bonded);
-                    }
-                }
-            }
-
-            return false;
+            return CollectConnectedTokens(token1).Any(t => t.Id == token2.Id);
         }
 
         /// <summary>
@@ -433,20 +438,21 @@ namespace DigitalBiochemicalSimulator.Chemistry
         {
             _activeChains.Remove(originalChain);
 
-            // Create two new chains
-            var chain1 = CreateChainFromHead(token1, currentTick);
-            var chain2 = CreateChainFromHead(token2, currentTick);
-
-            if (chain1 != null)
-                _activeChains.Add(chain1);
-            if (chain2 != null)
-                _activeChains.Add(chain2);
+            // Create two new chains (a token left without bonds is no longer in a chain)
+            foreach (var token in new[] { token1, token2 })
+            {
+                var chain = CreateChainFromHead(token, originalChain.BondType, currentTick);
+                if (chain != null)
+                    _activeChains.Add(chain);
+                else
+                    ClearChainMembership(token);
+            }
         }
 
         /// <summary>
-        /// Creates a chain starting from a head token
+        /// Creates a chain from the tokens connected to a token
         /// </summary>
-        private TokenChain CreateChainFromHead(Token head, long currentTick)
+        private TokenChain? CreateChainFromHead(Token head, BondType bondType, long currentTick)
         {
             if (head == null || head.BondedTokens.Count == 0)
                 return null;
@@ -454,85 +460,27 @@ namespace DigitalBiochemicalSimulator.Chemistry
             var chain = new TokenChain
             {
                 Id = _nextChainId++,
-                Head = head,
+                BondType = bondType,
                 CreatedAt = currentTick,
                 LastModifiedAt = currentTick
             };
 
-            // Calculate chain properties
-            chain.Length = CalculateChainLength(head);
-            chain.Tail = FindTail(head);
-
-            // Update all tokens in chain
-            UpdateChainReferences(head, chain);
-            RecalculateChainStrength(chain);
-
+            RefreshChain(chain, head);
             return chain;
         }
 
         /// <summary>
-        /// Calculates the length of a chain
+        /// Gets the chain containing a specific token, or null if it is not in a chain
         /// </summary>
-        private int CalculateChainLength(Token head)
+        public TokenChain? GetTokenChain(Token token)
         {
-            var visited = new HashSet<long>();
-            var queue = new Queue<Token>();
-            queue.Enqueue(head);
-
-            while (queue.Count > 0)
-            {
-                var current = queue.Dequeue();
-                if (visited.Contains(current.Id))
-                    continue;
-
-                visited.Add(current.Id);
-
-                foreach (var bonded in current.BondedTokens)
-                {
-                    if (!visited.Contains(bonded.Id))
-                    {
-                        queue.Enqueue(bonded);
-                    }
-                }
-            }
-
-            return visited.Count;
-        }
-
-        /// <summary>
-        /// Finds the tail token of a chain
-        /// </summary>
-        private Token FindTail(Token head)
-        {
-            Token tail = head;
-            var visited = new HashSet<long>();
-
-            while (tail.BondedTokens.Count > 0)
-            {
-                visited.Add(tail.Id);
-                bool foundNext = false;
-
-                foreach (var bonded in tail.BondedTokens)
-                {
-                    if (!visited.Contains(bonded.Id))
-                    {
-                        tail = bonded;
-                        foundNext = true;
-                        break;
-                    }
-                }
-
-                if (!foundNext)
-                    break;
-            }
-
-            return tail;
+            return FindChainContaining(token);
         }
 
         /// <summary>
         /// Finds the chain containing a specific token
         /// </summary>
-        private TokenChain FindChainContaining(Token token)
+        private TokenChain? FindChainContaining(Token token)
         {
             if (token == null)
                 return null;

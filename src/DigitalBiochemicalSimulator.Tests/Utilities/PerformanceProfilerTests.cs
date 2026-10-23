@@ -81,10 +81,10 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             // Arrange
             var profiler = new PerformanceProfiler();
 
-            // Act
-            using (profiler.Profile("Fast")) { Thread.Sleep(5); }
-            using (profiler.Profile("Slow")) { Thread.Sleep(20); }
-            using (profiler.Profile("Medium")) { Thread.Sleep(10); }
+            // Act - exact durations, so the order does not depend on timer precision
+            profiler.Record("Fast", 5);
+            profiler.Record("Slow", 20);
+            profiler.Record("Medium", 10);
 
             var allStats = profiler.GetAllStats();
 

@@ -6,7 +6,7 @@ This guide explains how to build executable distributions of the Digital Biochem
 
 ### Required
 
-- **.NET 6.0 SDK or later**
+- **.NET 10.0 SDK or later**
   - Download from: https://dotnet.microsoft.com/download
   - Verify installation: `dotnet --version`
 
@@ -171,7 +171,7 @@ Creates smaller executables that require .NET runtime on target machine:
 - Faster startup
 
 **Disadvantages:**
-- Requires .NET 6.0 runtime on target machine
+- Requires .NET 10.0 runtime on target machine
 - More complex deployment
 
 ### Trimmed Build (Experimental)

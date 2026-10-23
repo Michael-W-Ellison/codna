@@ -1,4 +1,5 @@
 using Xunit;
+using DigitalBiochemicalSimulator.Tests.TestHelpers;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.Chemistry;
 using DigitalBiochemicalSimulator.Grammar;
@@ -99,7 +100,7 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
         }
 
         [Fact]
-        public void ChainStability_IncreasesWith ValidGrammar()
+        public void ChainStability_IncreasesWithValidGrammar()
         {
             // Arrange
             var config = SimulationConfig.CreateMinimal();
@@ -129,9 +130,7 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
             };
 
             // Create chain
-            var chain = new TokenChain(token5);
-            chain.AddToken(tokenPlus);
-            chain.AddToken(token3);
+            var chain = TestChains.Build(token5, tokenPlus, token3);
             chain.IsValid = rulesEngine.MatchesGrammar(chain.Tokens);
             chain.AverageBondStrength = 0.7f;
             chain.LastModifiedTick = 0;
@@ -172,19 +171,29 @@ namespace DigitalBiochemicalSimulator.Tests.Integration
                 Metadata = new TokenMetadata("operator", "arithmetic", "binary_operator", 0.6f, 2)
             };
 
-            var chain = new TokenChain(tokenPlus1);
-            chain.AddToken(token5);
-            chain.AddToken(tokenPlus2);
+            var chain = TestChains.Build(tokenPlus1, token5, tokenPlus2);
             chain.IsValid = rulesEngine.MatchesGrammar(chain.Tokens);
             chain.AverageBondStrength = 0.5f;
             chain.LastModifiedTick = 0;
 
+            // A valid chain "5 + 3" with the same bond strength, energy and age
+            var validChain = TestChains.Build(
+                new Token(4, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero) { Energy = 100 },
+                new Token(5, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero) { Energy = 100 },
+                new Token(6, TokenType.INTEGER_LITERAL, "3", Vector3Int.Zero) { Energy = 100 });
+            validChain.IsValid = rulesEngine.MatchesGrammar(validChain.Tokens);
+            validChain.AverageBondStrength = 0.5f;
+            validChain.LastModifiedTick = 0;
+
             // Act
             long currentTick = 50;
             float stability = stabilityCalculator.CalculateStability(chain, currentTick);
+            float validStability = stabilityCalculator.CalculateStability(validChain, currentTick);
 
             // Assert
-            Assert.True(stability < 0.5f, "Invalid grammar should have lower stability");
+            Assert.False(chain.IsValid);
+            Assert.True(validChain.IsValid);
+            Assert.True(stability < validStability, "Invalid grammar should have lower stability");
         }
     }
 }

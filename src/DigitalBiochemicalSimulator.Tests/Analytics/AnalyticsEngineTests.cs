@@ -26,7 +26,7 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var analytics = new AnalyticsEngine();
 
             // Act & Assert - should not throw
-            analytics.RecordSnapshot(null, tick: 100);
+            analytics.RecordSnapshot(null!, tick: 100);
         }
 
         [Fact]

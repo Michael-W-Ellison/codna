@@ -13,11 +13,11 @@ namespace DigitalBiochemicalSimulator.Simulation
     public class SimulationState
     {
         public StateMetadata Metadata { get; set; }
-        public SimulationConfigState Configuration { get; set; }
+        public SimulationConfigState? Configuration { get; set; }
         public List<TokenState> Tokens { get; set; }
         public List<ChainState> Chains { get; set; }
-        public GridState Grid { get; set; }
-        public StatisticsState Statistics { get; set; }
+        public GridState? Grid { get; set; }
+        public StatisticsState? Statistics { get; set; }
 
         public SimulationState()
         {
@@ -51,7 +51,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public string Version { get; set; } = "1.0";
         public DateTime SavedAt { get; set; } = DateTime.Now;
         public long CurrentTick { get; set; }
-        public string Description { get; set; }
+        public string? Description { get; set; }
         public Dictionary<string, string> CustomData { get; set; }
 
         public StateMetadata()
@@ -70,9 +70,52 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int GridDepth { get; set; }
         public int CellCapacity { get; set; }
         public int MaxTokens { get; set; }
-        public int TokenGenerationRate { get; set; }
+        public int? TokenGenerationRate { get; set; }
         public int TicksPerSecond { get; set; }
-        public float GravityStrength { get; set; }
+        public float? GravityStrength { get; set; }
+
+        // Remaining settings; null when loading a save written before they were stored
+        public int? InitialTokenEnergy { get; set; }
+        public int? EnergyPerTick { get; set; }
+        public int? RiseRate { get; set; }
+        public int? FallRate { get; set; }
+        public bool? GravityEnabled { get; set; }
+        public int? EnvironmentViscosity { get; set; }
+        public int? VentEmissionRate { get; set; }
+        public int? NumberOfVents { get; set; }
+        public VentDistribution? VentDistribution { get; set; }
+        public float? MinBondStrength { get; set; }
+        public int? BondingRadius { get; set; }
+        public float? BondingRange { get; set; }
+        public int? EnergyPerBond { get; set; }
+        public float? CovalentBondStrength { get; set; }
+        public float? IonicBondStrength { get; set; }
+        public float? VanDerWaalsBondStrength { get; set; }
+        public float? BaseDamageRate { get; set; }
+        public float? DamageExponent { get; set; }
+        public float? CriticalDamageThreshold { get; set; }
+        public float? DamageIncrement { get; set; }
+        public float? DamageMultiplier { get; set; }
+        public int? MutationRange { get; set; }
+        public int? MutationRate { get; set; }
+        public MutationFalloff? MutationFalloff { get; set; }
+        public int? MinValidationLength { get; set; }
+        public int? StabilityThreshold { get; set; }
+        public int? ValidationFrequency { get; set; }
+        public int? MaxChains { get; set; }
+        public bool? RecycleIdleTokens { get; set; }
+        public float? ReplicationRate { get; set; }
+        public int? ReplicationRange { get; set; }
+        public float? ReplicationErrorRate { get; set; }
+        public float? ReplicationInsertionRate { get; set; }
+        public float? ReplicationDeletionRate { get; set; }
+        public bool? FitnessWeightedReplication { get; set; }
+        public float? ChainDecayRate { get; set; }
+        public bool? FitnessWeightedDecay { get; set; }
+        public int? ReplicationTimeout { get; set; }
+        public TokenDistributionProfile? TokenDistribution { get; set; }
+        public Vector3IntState? VentPosition { get; set; }
+
         public Dictionary<string, object> AdditionalSettings { get; set; }
 
         public SimulationConfigState()
@@ -91,7 +134,47 @@ namespace DigitalBiochemicalSimulator.Simulation
                 MaxTokens = config.MaxTokens,
                 TokenGenerationRate = config.TokenGenerationRate,
                 TicksPerSecond = config.TicksPerSecond,
-                GravityStrength = config.GravityStrength
+                GravityStrength = config.GravityStrength,
+                InitialTokenEnergy = config.InitialTokenEnergy,
+                EnergyPerTick = config.EnergyPerTick,
+                RiseRate = config.RiseRate,
+                FallRate = config.FallRate,
+                GravityEnabled = config.GravityEnabled,
+                EnvironmentViscosity = config.EnvironmentViscosity,
+                VentEmissionRate = config.VentEmissionRate,
+                NumberOfVents = config.NumberOfVents,
+                VentDistribution = config.VentDistribution,
+                MinBondStrength = config.MinBondStrength,
+                BondingRadius = config.BondingRadius,
+                BondingRange = config.BondingRange,
+                EnergyPerBond = config.EnergyPerBond,
+                CovalentBondStrength = config.CovalentBondStrength,
+                IonicBondStrength = config.IonicBondStrength,
+                VanDerWaalsBondStrength = config.VanDerWaalsBondStrength,
+                BaseDamageRate = config.BaseDamageRate,
+                DamageExponent = config.DamageExponent,
+                CriticalDamageThreshold = config.CriticalDamageThreshold,
+                DamageIncrement = config.DamageIncrement,
+                DamageMultiplier = config.DamageMultiplier,
+                MutationRange = config.MutationRange,
+                MutationRate = config.MutationRate,
+                MutationFalloff = config.MutationFalloff,
+                MinValidationLength = config.MinValidationLength,
+                StabilityThreshold = config.StabilityThreshold,
+                ValidationFrequency = config.ValidationFrequency,
+                MaxChains = config.MaxChains,
+                RecycleIdleTokens = config.RecycleIdleTokens,
+                ReplicationRate = config.ReplicationRate,
+                ReplicationRange = config.ReplicationRange,
+                ReplicationErrorRate = config.ReplicationErrorRate,
+                ReplicationInsertionRate = config.ReplicationInsertionRate,
+                ReplicationDeletionRate = config.ReplicationDeletionRate,
+                FitnessWeightedReplication = config.FitnessWeightedReplication,
+                ChainDecayRate = config.ChainDecayRate,
+                FitnessWeightedDecay = config.FitnessWeightedDecay,
+                ReplicationTimeout = config.ReplicationTimeout,
+                TokenDistribution = config.TokenDistribution,
+                VentPosition = new Vector3IntState { X = config.VentPosition.X, Y = config.VentPosition.Y, Z = config.VentPosition.Z }
             };
         }
     }
@@ -102,16 +185,17 @@ namespace DigitalBiochemicalSimulator.Simulation
     public class TokenState
     {
         public long Id { get; set; }
-        public string Type { get; set; }
-        public string Value { get; set; }
-        public Vector3IntState Position { get; set; }
-        public Vector3IntState Velocity { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public Vector3IntState Position { get; set; } = new Vector3IntState();
+        public Vector3IntState Velocity { get; set; } = new Vector3IntState();
         public int Energy { get; set; }
         public int Mass { get; set; }
         public bool IsActive { get; set; }
+        public bool IsDamaged { get; set; }
         public float DamageLevel { get; set; }
         public List<long> BondedTokenIds { get; set; }
-        public TokenMetadataState Metadata { get; set; }
+        public TokenMetadataState? Metadata { get; set; }
         public long ChainId { get; set; }
         public int ChainPosition { get; set; }
 
@@ -132,6 +216,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 Energy = token.Energy,
                 Mass = token.Mass,
                 IsActive = token.IsActive,
+                IsDamaged = token.IsDamaged,
                 DamageLevel = token.DamageLevel,
                 BondedTokenIds = token.BondedTokens.Select(t => t.Id).ToList(),
                 Metadata = token.Metadata != null ? TokenMetadataState.FromMetadata(token.Metadata) : null,
@@ -146,9 +231,9 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// </summary>
     public class TokenMetadataState
     {
-        public string Category { get; set; }
-        public string Subtype { get; set; }
-        public string Role { get; set; }
+        public string Category { get; set; } = string.Empty;
+        public string Subtype { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
         public float Electronegativity { get; set; }
         public int BondCapacity { get; set; }
 
@@ -156,11 +241,11 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             return new TokenMetadataState
             {
-                Category = metadata.Category,
-                Subtype = metadata.Subtype,
-                Role = metadata.Role,
+                Category = metadata.SyntaxCategory,
+                Subtype = metadata.SemanticType,
+                Role = metadata.GrammarRole,
                 Electronegativity = metadata.Electronegativity,
-                BondCapacity = metadata.BondCapacity
+                BondCapacity = metadata.BondingCapacity
             };
         }
     }
@@ -193,7 +278,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public float StabilityScore { get; set; }
         public float AverageBondStrength { get; set; }
         public bool IsValid { get; set; }
-        public string BondType { get; set; }
+        public string BondType { get; set; } = string.Empty;
         public long CreatedAt { get; set; }
         public long LastModifiedAt { get; set; }
 
@@ -243,7 +328,7 @@ namespace DigitalBiochemicalSimulator.Simulation
     /// </summary>
     public class CellState
     {
-        public Vector3IntState Position { get; set; }
+        public Vector3IntState Position { get; set; } = new Vector3IntState();
         public List<long> TokenIds { get; set; }
         public bool IsActive { get; set; }
 
@@ -279,7 +364,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 StableChains = snapshot.StableChains,
                 ValidChains = snapshot.ValidChains,
                 AverageEnergy = (float)snapshot.AverageEnergy,
-                AverageStability = snapshot.AverageChainStability,
+                AverageStability = (float)snapshot.AverageChainStability,
                 TicksPerSecond = snapshot.TicksPerSecond
             };
         }
@@ -337,6 +422,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             };
 
             // Only save occupied cells to reduce file size
+            var activeCells = grid.ActiveCells;
             var occupiedCells = new List<CellState>();
             for (int x = 0; x < grid.Width; x++)
             {
@@ -351,7 +437,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                             {
                                 Position = new Vector3IntState { X = x, Y = y, Z = z },
                                 TokenIds = cell.Tokens.Select(t => t.Id).ToList(),
-                                IsActive = cell.IsActive
+                                IsActive = activeCells.Contains(new Vector3Int(x, y, z))
                             });
                         }
                     }

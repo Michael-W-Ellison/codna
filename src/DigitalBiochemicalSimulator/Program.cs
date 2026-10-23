@@ -8,6 +8,9 @@ using DigitalBiochemicalSimulator.Simulation;
 using DigitalBiochemicalSimulator.Visualization;
 using DigitalBiochemicalSimulator.Web;
 using DigitalBiochemicalSimulator.Grammar;
+using PresetCatalog = DigitalBiochemicalSimulator.Presets.PresetCatalog;
+using PresetInfo = DigitalBiochemicalSimulator.Presets.PresetInfo;
+using Grid = DigitalBiochemicalSimulator.DataStructures.Grid;
 
 namespace DigitalBiochemicalSimulator
 {
@@ -42,7 +45,7 @@ namespace DigitalBiochemicalSimulator
                 AnsiConsole.Write(
                     new FigletText("Digital Biochemical Simulator")
                         .Centered()
-                        .Color(Color.Cyan));
+                        .Color(Color.Aqua));
 
                 var choice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
@@ -240,27 +243,16 @@ namespace DigitalBiochemicalSimulator
         {
             Console.WriteLine("\n--- Full Simulation ---\n");
 
-            Console.WriteLine("Select preset:");
-            Console.WriteLine("1. Minimal (10x10x10, fast)");
-            Console.WriteLine("2. Standard (50x50x50, balanced)");
-            Console.WriteLine("3. Expression Evolution (optimized for math)");
-            Console.WriteLine("4. Harsh Selection (strong evolutionary pressure)");
-            Console.Write("\nChoice: ");
-
-            SimulationConfig config = Console.ReadLine() switch
-            {
-                "1" => SimulationPresets.Minimal,
-                "2" => SimulationPresets.Standard,
-                "3" => SimulationPresets.ExpressionEvolution,
-                "4" => SimulationPresets.HarshSelection,
-                _ => SimulationPresets.Standard
-            };
+            var preset = SelectPreset("Select preset:");
+            var config = preset.Create();
 
             Console.WriteLine($"\nStarting simulation with {config.GridWidth}x{config.GridHeight}x{config.GridDepth} grid...");
             Console.WriteLine("Press 'P' to pause/unpause, 'Q' to quit, 'S' for stats");
             Console.WriteLine();
 
-            var simulation = new SimulationEngine(config);
+            Console.WriteLine($"Preset: {preset.Name}");
+
+            using var simulation = new IntegratedSimulationEngine(config);
             simulation.Start();
 
             bool running = true;
@@ -336,17 +328,7 @@ namespace DigitalBiochemicalSimulator
             }
             else
             {
-                config = AnsiConsole.Prompt(
-                    new SelectionPrompt<SimulationConfig>()
-                        .Title("[green]Select preset configuration:[/]")
-                        .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
-                        .AddChoices(new[] {
-                            SimulationPresets.Minimal,
-                            SimulationPresets.Standard,
-                            SimulationPresets.ExpressionEvolution,
-                            SimulationPresets.HarshSelection,
-                            SimulationPresets.RapidEvolution
-                        }));
+                config = SelectPreset("Select preset configuration:").Create();
             }
 
             AnsiConsole.Clear();
@@ -497,21 +479,12 @@ namespace DigitalBiochemicalSimulator
             AnsiConsole.MarkupLine("[bold cyan]Custom Configuration[/]\n");
 
             // Start with a base preset
-            var basePreset = AnsiConsole.Prompt(
-                new SelectionPrompt<SimulationConfig>()
-                    .Title("[green]Start with preset as base:[/]")
-                    .UseConverter(c => GetPresetName(c))
-                    .AddChoices(new[] {
-                        SimulationPresets.Minimal,
-                        SimulationPresets.Standard,
-                        SimulationPresets.ExpressionEvolution,
-                        SimulationPresets.HarshSelection,
-                        SimulationPresets.RapidEvolution
-                    }));
+            var basePresetInfo = SelectPreset("Start with preset as base:");
+            var basePreset = basePresetInfo.Create();
 
             var config = basePreset.Clone();
 
-            AnsiConsole.MarkupLine($"\n[yellow]Customizing configuration based on: {GetPresetName(basePreset)}[/]\n");
+            AnsiConsole.MarkupLine($"\n[yellow]Customizing configuration based on: {Markup.Escape(basePresetInfo.Name)}[/]\n");
 
             // Configuration categories to customize
             var categories = AnsiConsole.Prompt(
@@ -522,13 +495,14 @@ namespace DigitalBiochemicalSimulator
                     .InstructionsText("[grey](Press [blue]space[/] to toggle, [green]enter[/] to accept)[/]")
                     .AddChoices(new[] {
                         "Bond Strengths (Covalent, Ionic, Van der Waals)",
-                        "Bonding Behavior (Radius, Minimum Strength)",
+                        "Bonding Behavior (Radius, Range, Minimum Strength)",
                         "Grid Dimensions & Cell Capacity",
                         "Energy Parameters & Metabolism",
                         "Physics (Gravity, Viscosity, Motion)",
                         "Damage & Mutation Parameters",
                         "Thermal Vents & Token Distribution",
                         "Validation & Chain Stability",
+                        "Replication (Inheritance)",
                         "Performance Limits"
                     }));
 
@@ -563,7 +537,7 @@ namespace DigitalBiochemicalSimulator
             }
 
             // Customize Bonding Behavior
-            if (categories.Contains("Bonding Behavior (Radius, Minimum Strength)"))
+            if (categories.Contains("Bonding Behavior (Radius, Range, Minimum Strength)"))
             {
                 AnsiConsole.MarkupLine("\n[bold cyan]═══ Bonding Behavior ═══[/]");
                 AnsiConsole.MarkupLine("[dim]Controls how tokens bond with each other[/]\n");
@@ -574,6 +548,12 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 0 and 5[/]")
                         .Validate(v => v >= 0 && v <= 5));
 
+                config.BondingRange = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Bonding Range (distance in cells; the larger of radius and range is used):[/]")
+                        .DefaultValue(config.BondingRange)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 5.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 5.0f));
+
                 config.MinBondStrength = AnsiConsole.Prompt(
                     new TextPrompt<float>("[cyan]Minimum Bond Strength (threshold):[/]")
                         .DefaultValue(config.MinBondStrength)
@@ -582,6 +562,7 @@ namespace DigitalBiochemicalSimulator
 
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Bonding behavior configured:");
                 AnsiConsole.MarkupLine($"  Radius: [yellow]{config.BondingRadius}[/] cells");
+                AnsiConsole.MarkupLine($"  Range: [yellow]{config.BondingRange:F1}[/] cells (effective: {config.EffectiveBondingRange:F1})");
                 AnsiConsole.MarkupLine($"  Min Strength: [yellow]{config.MinBondStrength:F2}[/]");
             }
 
@@ -672,10 +653,17 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 1 and 10[/]")
                         .Validate(v => v >= 1 && v <= 10));
 
+                config.GravityStrength = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Gravity Strength (multiplier on fall rate):[/]")
+                        .DefaultValue(config.GravityStrength)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 10.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 10.0f));
+
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Physics configured:");
                 AnsiConsole.MarkupLine($"  Gravity: [yellow]{(config.GravityEnabled ? "Enabled" : "Disabled")}[/]");
                 AnsiConsole.MarkupLine($"  Rise Rate: [yellow]{config.RiseRate}[/] cells/tick");
                 AnsiConsole.MarkupLine($"  Fall Rate: [yellow]{config.FallRate}[/] cells/tick");
+                AnsiConsole.MarkupLine($"  Gravity Strength: [yellow]{config.GravityStrength:F2}[/]");
             }
 
             // Customize Damage & Mutation Parameters
@@ -695,6 +683,12 @@ namespace DigitalBiochemicalSimulator
                         .ValidationErrorMessage("[red]Must be between 1.0 and 10.0[/]")
                         .Validate(v => v >= 1.0f && v <= 10.0f));
 
+                config.DamageMultiplier = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Damage Multiplier (scales base damage rate):[/]")
+                        .DefaultValue(config.DamageMultiplier)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 10.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 10.0f));
+
                 config.CriticalDamageThreshold = AnsiConsole.Prompt(
                     new TextPrompt<float>("[cyan]Critical Damage Threshold:[/]")
                         .DefaultValue(config.CriticalDamageThreshold)
@@ -702,7 +696,7 @@ namespace DigitalBiochemicalSimulator
                         .Validate(v => v >= 0.5f && v <= 1.0f));
 
                 config.DamageIncrement = AnsiConsole.Prompt(
-                    new TextPrompt<float>("[cyan]Damage Increment (per collision):[/]")
+                    new TextPrompt<float>("[cyan]Damage Increment (maximum per damage event):[/]")
                         .DefaultValue(config.DamageIncrement)
                         .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
                         .Validate(v => v >= 0.0f && v <= 1.0f));
@@ -722,13 +716,12 @@ namespace DigitalBiochemicalSimulator
                 var mutationFalloffChoice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("[cyan]Mutation Falloff Pattern:[/]")
-                        .AddChoices(new[] { "Gradual", "Sharp", "None" }));
+                        .AddChoices(new[] { "Gradual", "Abrupt" }));
 
                 config.MutationFalloff = mutationFalloffChoice switch
                 {
                     "Gradual" => MutationFalloff.Gradual,
-                    "Sharp" => MutationFalloff.Sharp,
-                    "None" => MutationFalloff.None,
+                    "Abrupt" => MutationFalloff.Abrupt,
                     _ => MutationFalloff.Gradual
                 };
 
@@ -749,6 +742,12 @@ namespace DigitalBiochemicalSimulator
                 config.VentEmissionRate = AnsiConsole.Prompt(
                     new TextPrompt<int>("[cyan]Vent Emission Rate (ticks per token):[/]")
                         .DefaultValue(config.VentEmissionRate)
+                        .ValidationErrorMessage("[red]Must be between 1 and 100[/]")
+                        .Validate(v => v >= 1 && v <= 100));
+
+                config.TokenGenerationRate = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Token Generation Rate (tokens per emission):[/]")
+                        .DefaultValue(config.TokenGenerationRate)
                         .ValidationErrorMessage("[red]Must be between 1 and 100[/]")
                         .Validate(v => v >= 1 && v <= 100));
 
@@ -780,6 +779,7 @@ namespace DigitalBiochemicalSimulator
 
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Thermal vents & token distribution configured:");
                 AnsiConsole.MarkupLine($"  Vents: [yellow]{config.NumberOfVents}[/] ({ventDistChoice})");
+                AnsiConsole.MarkupLine($"  Emission: [yellow]{config.TokenGenerationRate}[/] token(s) every {config.VentEmissionRate} ticks");
                 AnsiConsole.MarkupLine($"  Distribution: [yellow]{tokenDistChoice}[/]");
             }
 
@@ -810,6 +810,65 @@ namespace DigitalBiochemicalSimulator
                 AnsiConsole.MarkupLine($"\n[green]✓[/] Validation & stability configured");
             }
 
+            // Customize Replication (Inheritance)
+            if (categories.Contains("Replication (Inheritance)"))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]═══ Replication (Inheritance) ═══[/]");
+                AnsiConsole.MarkupLine("[dim]Chains that pass validation copy themselves from free tokens nearby[/]\n");
+
+                config.ReplicationRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Rate (chance per tick for each eligible chain, 0 = off):[/]")
+                        .DefaultValue(config.ReplicationRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.ReplicationRange = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Replication Range (cells to gather free tokens from):[/]")
+                        .DefaultValue(config.ReplicationRange)
+                        .ValidationErrorMessage("[red]Must be between 0 and 10[/]")
+                        .Validate(v => v >= 0 && v <= 10));
+
+                config.ReplicationErrorRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Error Rate (chance a copy has a different token type at one position):[/]")
+                        .DefaultValue(config.ReplicationErrorRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.ReplicationInsertionRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Insertion Rate (chance a copy duplicates 1-2 positions):[/]")
+                        .DefaultValue(config.ReplicationInsertionRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.ReplicationDeletionRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Replication Deletion Rate (chance a copy leaves out 1-2 positions):[/]")
+                        .DefaultValue(config.ReplicationDeletionRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.FitnessWeightedReplication = AnsiConsole.Confirm(
+                    "[cyan]Fitness-weighted copying (longer, more complete chains copy more often)?[/]",
+                    config.FitnessWeightedReplication);
+
+                config.ChainDecayRate = AnsiConsole.Prompt(
+                    new TextPrompt<float>("[cyan]Chain Decay Rate (chance per tick a chain breaks down, 0 = never):[/]")
+                        .DefaultValue(config.ChainDecayRate)
+                        .ValidationErrorMessage("[red]Must be between 0.0 and 1.0[/]")
+                        .Validate(v => v >= 0.0f && v <= 1.0f));
+
+                config.ReplicationTimeout = AnsiConsole.Prompt(
+                    new TextPrompt<int>("[cyan]Replication Timeout (ticks a copy may spend gathering tokens):[/]")
+                        .DefaultValue(config.ReplicationTimeout)
+                        .ValidationErrorMessage("[red]Must be between 1 and 10000[/]")
+                        .Validate(v => v >= 1 && v <= 10000));
+
+                config.FitnessWeightedDecay = AnsiConsole.Confirm(
+                    "[cyan]Fitness-weighted decay (longer, more complete chains last longer)?[/]",
+                    config.FitnessWeightedDecay);
+
+                AnsiConsole.MarkupLine($"\n[green]✓[/] Replication configured");
+            }
+
             // Customize Performance Limits
             if (categories.Contains("Performance Limits"))
             {
@@ -826,6 +885,10 @@ namespace DigitalBiochemicalSimulator
                         .DefaultValue(config.MaxChains)
                         .ValidationErrorMessage("[red]Must be between 10 and 1000[/]")
                         .Validate(v => v >= 10 && v <= 1000));
+
+                config.RecycleIdleTokens = AnsiConsole.Confirm(
+                    "[cyan]Recycle the oldest unbonded tokens when the token limit is reached (keeps new tokens arriving)?[/]",
+                    config.RecycleIdleTokens);
 
                 config.TicksPerSecond = AnsiConsole.Prompt(
                     new TextPrompt<int>("[cyan]Ticks Per Second:[/]")
@@ -853,14 +916,21 @@ namespace DigitalBiochemicalSimulator
         /// <summary>
         /// Gets a friendly name for a preset configuration
         /// </summary>
-        static string GetPresetName(SimulationConfig config)
+        /// <summary>
+        /// Prompts for one of the presets in the preset catalog
+        /// </summary>
+        static PresetInfo SelectPreset(string title)
         {
-            if (config.GridWidth == 10) return "Minimal";
-            if (config.GridWidth == 50) return "Standard";
-            if (config.DamageExponent == 2.5f) return "Expression Evolution";
-            if (config.DamageExponent == 4.0f) return "Harsh Selection";
-            if (config.VentEmissionRate == 2) return "Rapid Evolution";
-            return "Custom";
+            return AnsiConsole.Prompt(
+                new SelectionPrompt<PresetInfo>()
+                    .Title($"[green]{Markup.Escape(title)}[/]")
+                    .PageSize(16)
+                    .UseConverter(p =>
+                    {
+                        var c = p.Create();
+                        return Markup.Escape($"{p.Name} ({c.GridWidth}x{c.GridHeight}x{c.GridDepth}) - {p.Description}");
+                    })
+                    .AddChoices(PresetCatalog.All));
         }
 
         /// <summary>
@@ -887,17 +957,7 @@ namespace DigitalBiochemicalSimulator
             }
             else
             {
-                config = AnsiConsole.Prompt(
-                    new SelectionPrompt<SimulationConfig>()
-                        .Title("[green]Select preset configuration:[/]")
-                        .UseConverter(c => $"{c.GridWidth}x{c.GridHeight}x{c.GridDepth} - {GetPresetName(c)}")
-                        .AddChoices(new[] {
-                            SimulationPresets.Minimal,
-                            SimulationPresets.Standard,
-                            SimulationPresets.ExpressionEvolution,
-                            SimulationPresets.HarshSelection,
-                            SimulationPresets.RapidEvolution
-                        }));
+                config = SelectPreset("Select preset configuration:").Create();
             }
 
             var port = AnsiConsole.Ask<int>("[cyan]Web server port:[/]", 8080);
@@ -932,7 +992,7 @@ namespace DigitalBiochemicalSimulator
                              $"[dim]Press any key to stop the simulation...[/]"))
                 {
                     Header = new PanelHeader("[bold cyan]🌐 Web Interface Active[/]"),
-                    BorderColor = Color.Cyan,
+                    BorderStyle = new Style(Color.Aqua),
                     Padding = new Padding(2, 1, 2, 1)
                 };
 
@@ -1181,7 +1241,7 @@ namespace DigitalBiochemicalSimulator
             AnsiConsole.Write(
                 new FigletText("Chain Analysis")
                     .Centered()
-                    .Color(Color.Cyan));
+                    .Color(Color.Aqua));
 
             var analysis = simulation.GetLatestAnalysis();
 
@@ -1267,8 +1327,8 @@ namespace DigitalBiochemicalSimulator
                     AnsiConsole.WriteLine();
                     AnsiConsole.Write(new Panel(selectedChain.GetDetailedReport())
                         .Header($"[bold cyan]Chain {chainId}[/]")
-                        .Border(TableBorder.Rounded)
-                        .BorderColor(Color.Cyan));
+                        .Border(BoxBorder.Rounded)
+                        .BorderColor(Color.Aqua));
 
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine("[dim]Press any key to continue...[/]");

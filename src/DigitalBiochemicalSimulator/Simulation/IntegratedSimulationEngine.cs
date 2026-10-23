@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
@@ -60,6 +61,13 @@ namespace DigitalBiochemicalSimulator.Simulation
         public ChainAnalyzer ChainAnalyzer { get; private set; }
         private List<ComprehensiveAnalysisResult> _latestAnalysis;
         private readonly object _analysisLock = new object();
+        private readonly SemanticValidator _semanticValidator = new SemanticValidator();
+        private readonly Random _random = new Random();
+        private readonly Dictionary<long, long> _pendingParentIds = new Dictionary<long, long>(); // copy chain ID -> parent chain ID
+
+        // Replication
+        public ChainReplicator ChainReplicator { get; private set; }
+        public long TotalReplications { get; private set; }
 
         // State
         public List<Token> ActiveTokens { get; private set; }
@@ -68,6 +76,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Statistics
         public long TotalTokensGenerated { get; private set; }
         public long TotalTokensDestroyed { get; private set; }
+        public long TotalTokensRecycled { get; private set; }
         public long TotalBondsFormed { get; private set; }
         public long TotalBondsBroken { get; private set; }
 
@@ -87,6 +96,13 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Initializes all simulation systems
         /// </summary>
+        [MemberNotNull(nameof(Grid), nameof(TickManager), nameof(TokenPool), nameof(TokenFactory),
+            nameof(ThermalVents), nameof(EnergyManager), nameof(MotionController), nameof(GravitySimulator),
+            nameof(CollisionDetector), nameof(BondRulesEngine), nameof(BondStrengthCalculator),
+            nameof(BondingManager), nameof(RepulsionHandler), nameof(ChainStabilityCalculator),
+            nameof(ChainRegistry), nameof(DamageSystem), nameof(CellProcessor), nameof(Statistics),
+            nameof(Analytics), nameof(ChainAnalyzer), nameof(_latestAnalysis), nameof(ActiveTokens),
+            nameof(ChainReplicator))]
         private void InitializeSystems()
         {
             // Core systems
@@ -118,7 +134,8 @@ namespace DigitalBiochemicalSimulator.Simulation
             DamageSystem = new DamageSystem(Config, BondingManager);
 
             // Integration systems
-            CellProcessor = new CellProcessor(BondingManager, RepulsionHandler, Config);
+            CellProcessor = new CellProcessor(BondingManager, RepulsionHandler, Config, Grid);
+            ChainReplicator = new ChainReplicator(BondingManager, Grid, Config);
 
             // Initialize thermal vents
             ThermalVents = new List<ThermalVent>();
@@ -157,7 +174,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 var position = GetVentPosition(i);
                 var vent = new ThermalVent(position, TokenFactory,
-                    Config.VentEmissionRate, Config.InitialTokenEnergy);
+                    Config.VentEmissionRate, Config.InitialTokenEnergy)
+                {
+                    TokensPerEmission = Config.TokenGenerationRate
+                };
 
                 // Set distribution based on config
                 if (Config.TokenDistribution == TokenDistributionProfile.ExpressionHeavy)
@@ -181,18 +201,18 @@ namespace DigitalBiochemicalSimulator.Simulation
             switch (Config.VentDistribution)
             {
                 case VentDistribution.Central:
-                    return new Vector3Int(Config.GridWidth / 2, 0, Config.GridDepth / 2);
+                    return new Vector3Int(Config.GridWidth / 2, Config.GridHeight / 2, 0);
 
                 case VentDistribution.Distributed:
                     int spacing = Config.GridWidth / (Config.NumberOfVents + 1);
-                    return new Vector3Int(spacing * (ventIndex + 1), 0, Config.GridDepth / 2);
+                    return new Vector3Int(spacing * (ventIndex + 1), Config.GridHeight / 2, 0);
 
                 case VentDistribution.Random:
                     var random = new Random();
                     return new Vector3Int(
                         random.Next(0, Config.GridWidth),
-                        0,
-                        random.Next(0, Config.GridDepth)
+                        random.Next(0, Config.GridHeight),
+                        0
                     );
 
                 default:
@@ -227,7 +247,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
-        /// Main simulation loop - processes one tick
+        /// Main simulation loop - processes one tick once the tick duration has elapsed
         /// Fully integrated version with all systems
         /// </summary>
         public void Update()
@@ -235,6 +255,14 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (!IsRunning || !TickManager.ShouldTick())
                 return;
 
+            Step();
+        }
+
+        /// <summary>
+        /// Processes exactly one tick, without waiting for the tick duration to elapse
+        /// </summary>
+        public void Step()
+        {
             TickManager.Tick();
             long currentTick = TickManager.CurrentTick;
 
@@ -278,14 +306,42 @@ namespace DigitalBiochemicalSimulator.Simulation
         {
             foreach (var vent in ThermalVents)
             {
-                var token = vent.GenerateToken(TickManager.CurrentTick);
-                if (token != null)
+                foreach (var token in vent.GenerateTokens(TickManager.CurrentTick))
                 {
+                    // At MaxActiveTokens, vents replace the oldest unbonded token (RecycleIdleTokens)
+                    // or stop adding tokens
+                    if (ActiveTokens.Count >= Config.MaxActiveTokens &&
+                        !(Config.RecycleIdleTokens && RecycleOldestFreeToken()))
+                    {
+                        TokenPool.ReleaseToken(token);
+                        continue;
+                    }
+
                     Grid.AddToken(token);
                     ActiveTokens.Add(token);
                     TotalTokensGenerated++;
                 }
             }
+        }
+
+        /// <summary>
+        /// Removes the oldest token that is not bonded or reserved, preferring resting tokens (no energy).
+        /// Returns false when every token is bonded or reserved for a copy.
+        /// </summary>
+        private bool RecycleOldestFreeToken()
+        {
+            // ActiveTokens is in the order tokens were generated, so the first match is the oldest
+            var token = ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0 && !t.IsReserved && t.Energy == 0)
+                        ?? ActiveTokens.FirstOrDefault(t => t.BondedTokens.Count == 0 && !t.IsReserved);
+            if (token == null)
+                return false;
+
+            Grid.RemoveToken(token);
+            ActiveTokens.Remove(token);
+            TokenPool.ReleaseToken(token);
+            TotalTokensDestroyed++;
+            TotalTokensRecycled++;
+            return true;
         }
 
         /// <summary>
@@ -340,13 +396,257 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         private void UpdateChains(long currentTick)
         {
-            // Update stability scores for all chains
+            // Track the chains formed by the bonding manager
+            SyncChainRegistry(currentTick);
+            var trackedIds = RegisteredChainIds();
+
+            // Chain turnover: chains break down at random and return their tokens
+            DecayChains(currentTick);
+            trackedIds = RegisteredChainIds();
+
+            // Update stability scores and stable status
             ChainRegistry.UpdateAllStabilities(currentTick);
 
-            // Prune stale chains periodically (every 100 ticks)
-            if (currentTick % 100 == 0)
+            // Validate chains every ValidationFrequency ticks
+            if (Config.ValidationFrequency > 0 && currentTick % Config.ValidationFrequency == 0)
             {
-                ChainRegistry.PruneStaleChains(currentTick, maxAge: 1000);
+                ValidateChains(currentTick); // records the end of each chain it removes
+                trackedIds = RegisteredChainIds();
+            }
+
+            EnforceChainLimit();
+            RecordChainDeaths(trackedIds, "ChainLimit", currentTick);
+
+            // Chains the registry dropped (invalid or over the limit) break apart
+            DissolveUntrackedChains(currentTick);
+
+            // Chains that passed validation copy themselves; copies are registered at the next
+            // sync (after the dissolve step above, which would otherwise treat them as dropped)
+            ReplicateChains(currentTick);
+        }
+
+        /// <summary>
+        /// Makes the chain registry match the bonding manager's active chains, and records
+        /// chain births and deaths in the evolution tracker
+        /// </summary>
+        private void SyncChainRegistry(long currentTick)
+        {
+            var activeChains = BondingManager.GetActiveChains();
+            var activeIds = new HashSet<long>(activeChains.Select(c => c.Id));
+
+            foreach (var chain in ChainRegistry.GetAllChains())
+            {
+                if (!activeIds.Contains(chain.Id))
+                {
+                    // Merged into another chain, split, or lost its bonds
+                    ChainRegistry.RemoveChain(chain.Id);
+                    Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, "Restructured");
+                }
+            }
+
+            foreach (var chain in activeChains)
+            {
+                if (ChainRegistry.GetChain(chain.Id) != chain)
+                {
+                    ChainRegistry.RegisterChain(chain);
+                    long? parentId = _pendingParentIds.TryGetValue(chain.Id, out var parent) ? parent : null;
+                    Analytics.Evolution.RecordChainFormation(chain, currentTick, parentId);
+                }
+            }
+
+            _pendingParentIds.Clear();
+        }
+
+        /// <summary>
+        /// Chance per tick that a chain decays
+        /// </summary>
+        internal static double DecayProbability(SimulationConfig config, double fitness, double averageFitness)
+        {
+            return config.FitnessWeightedDecay && fitness > 0
+                ? Math.Min(1.0, config.ChainDecayRate * averageFitness / fitness)
+                : config.ChainDecayRate;
+        }
+
+        /// <summary>
+        /// Chance per tick that an eligible chain replicates
+        /// </summary>
+        internal static double ReplicationProbability(SimulationConfig config, double fitness, double averageFitness)
+        {
+            return config.FitnessWeightedReplication && averageFitness > 0
+                ? Math.Min(1.0, config.ReplicationRate * fitness / averageFitness)
+                : config.ReplicationRate;
+        }
+
+        /// <summary>
+        /// Each chain breaks down with probability ChainDecayRate, or, with FitnessWeightedDecay,
+        /// ChainDecayRate * average fitness / its fitness (capped at 1), so fitter chains last longer.
+        /// Its lineage ends as Decayed and its bonds are broken by the dissolve step, returning its
+        /// tokens to the pool.
+        /// </summary>
+        private void DecayChains(long currentTick)
+        {
+            if (Config.ChainDecayRate <= 0.0f)
+                return;
+
+            var chains = ChainRegistry.GetAllChains()
+                .Select(c => (Chain: c, Fitness: ChainFitness.Calculate(c)))
+                .ToList();
+            if (chains.Count == 0)
+                return;
+
+            double averageFitness = chains.Average(c => c.Fitness);
+
+            foreach (var (chain, fitness) in chains)
+            {
+                if (_random.NextDouble() < DecayProbability(Config, fitness, averageFitness))
+                {
+                    ChainRegistry.RemoveChain(chain.Id);
+                    Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, "Decayed");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Advances copies in progress (see ChainReplicator), then each chain that passed validation,
+        /// is at least StabilityThreshold ticks old and is not already copying starts a copy with
+        /// probability ReplicationRate, or, with FitnessWeightedReplication, ReplicationRate * its
+        /// fitness / the average fitness of the eligible chains (capped at 1), so fitter chains copy
+        /// more often at the same average rate
+        /// </summary>
+        internal void ReplicateChains(long currentTick)
+        {
+            foreach (var (copy, parent) in ChainReplicator.Advance(currentTick, p => ChainRegistry.GetChain(p.Id) == p))
+            {
+                _pendingParentIds[copy.Id] = parent.Id;
+                TotalReplications++;
+            }
+
+            if (Config.ReplicationRate <= 0.0f)
+                return;
+
+            var eligible = ChainRegistry.GetAllChains()
+                .Where(c => c.PassedValidation && currentTick - c.CreatedAt >= Config.StabilityThreshold && !ChainReplicator.IsCopying(c))
+                .Select(c => (Chain: c, Fitness: ChainFitness.Calculate(c)))
+                .ToList();
+            if (eligible.Count == 0)
+                return;
+
+            double averageFitness = eligible.Average(e => e.Fitness);
+
+            foreach (var (parent, fitness) in eligible)
+            {
+                double probability = ReplicationProbability(Config, fitness, averageFitness);
+
+                if (_random.NextDouble() >= probability)
+                    continue;
+
+                ChainReplicator.StartCopy(parent);
+            }
+        }
+
+        private HashSet<long> RegisteredChainIds()
+        {
+            return new HashSet<long>(ChainRegistry.GetAllChains().Select(c => c.Id));
+        }
+
+        /// <summary>
+        /// Records the end of every chain in trackedIds that is no longer registered;
+        /// returns the IDs still registered
+        /// </summary>
+        private HashSet<long> RecordChainDeaths(HashSet<long> trackedIds, string reason, long currentTick)
+        {
+            var remaining = RegisteredChainIds();
+
+            foreach (var id in trackedIds)
+            {
+                if (!remaining.Contains(id))
+                    Analytics.Evolution.RecordChainDestruction(id, currentTick, reason);
+            }
+
+            return remaining;
+        }
+
+        /// <summary>
+        /// Validates chains that have reached MinValidationLength and either have not bonded for
+        /// StabilityThreshold ticks or, while still bonding, have gone StabilityThreshold ticks since
+        /// they formed or were last validated (so a chain cannot avoid validation by growing).
+        /// A chain must pass the syntax check (TokenChain.ValidateChain) and the semantic check
+        /// (SemanticValidator); chains that fail either are removed from the registry, and their
+        /// lineage ends with reason InvalidSyntax or InvalidSemantics.
+        /// </summary>
+        internal void ValidateChains(long currentTick)
+        {
+            foreach (var chain in ChainRegistry.GetAllChains())
+            {
+                if (chain.Length < Config.MinValidationLength)
+                    continue;
+
+                bool settled = currentTick - chain.LastModifiedTick >= Config.StabilityThreshold;
+                bool dueWhileBonding = currentTick - (chain.LastValidatedTick ?? chain.CreatedAt) >= Config.StabilityThreshold;
+                if (!settled && !dueWhileBonding)
+                    continue;
+
+                chain.LastValidatedTick = currentTick;
+                chain.PassedValidation = false;
+
+                string? failure = null;
+                if (!chain.ValidateChain().IsValid)
+                {
+                    failure = "InvalidSyntax";
+                }
+                else if (!_semanticValidator.ValidateChain(chain).IsValid)
+                {
+                    chain.IsValid = false;
+                    failure = "InvalidSemantics";
+                }
+
+                if (failure != null)
+                {
+                    ChainRegistry.RemoveChain(chain.Id);
+                    Analytics.Evolution.RecordChainDestruction(chain.Id, currentTick, failure);
+                }
+                else
+                {
+                    chain.PassedValidation = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Removes the least stable chains from the registry while it holds more than MaxChains
+        /// </summary>
+        private void EnforceChainLimit()
+        {
+            int excess = ChainRegistry.Count - Config.MaxChains;
+            if (excess <= 0)
+                return;
+
+            foreach (var chain in ChainRegistry.GetChainsByStability().AsEnumerable().Reverse().Take(excess).ToList())
+            {
+                ChainRegistry.RemoveChain(chain.Id);
+            }
+        }
+
+        /// <summary>
+        /// Breaks the bonds of every active chain that is no longer in the chain registry
+        /// </summary>
+        private void DissolveUntrackedChains(long currentTick)
+        {
+            foreach (var chain in BondingManager.GetActiveChains())
+            {
+                if (ChainRegistry.GetChain(chain.Id) == chain)
+                    continue;
+
+                foreach (var token in chain.Tokens.ToList())
+                {
+                    foreach (var bonded in token.BondedTokens.ToList())
+                    {
+                        if (BondingManager.BreakBond(token, bonded, currentTick))
+                            TotalBondsBroken++;
+                    }
+                }
+
+                BondingManager.RemoveChain(chain);
             }
         }
 
@@ -364,7 +664,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         private void RemoveInactiveTokens()
         {
-            var tokensToRemove = ActiveTokens.Where(t => !t.IsActive || t.Position.Y < 0).ToList();
+            var tokensToRemove = ActiveTokens.Where(t => !t.IsActive || t.Position.Z < 0).ToList();
 
             foreach (var token in tokensToRemove)
             {
@@ -396,7 +696,7 @@ namespace DigitalBiochemicalSimulator.Simulation
                 // Remove oldest falling tokens first
                 var tokenToRemove = ActiveTokens
                     .Where(t => t.Energy == 0)
-                    .OrderBy(t => t.Position.Y)
+                    .OrderBy(t => t.Position.Z)
                     .FirstOrDefault();
 
                 if (tokenToRemove != null)
@@ -471,6 +771,10 @@ namespace DigitalBiochemicalSimulator.Simulation
 
             // Reset systems
             TickManager.Reset();
+            foreach (var chain in BondingManager.GetActiveChains())
+            {
+                BondingManager.RemoveChain(chain);
+            }
             ChainRegistry.Clear();
             Statistics.ClearHistory();
             Analytics.Clear();
@@ -478,6 +782,10 @@ namespace DigitalBiochemicalSimulator.Simulation
             // Reset counters
             TotalTokensGenerated = 0;
             TotalTokensDestroyed = 0;
+            TotalTokensRecycled = 0;
+            TotalReplications = 0;
+            _pendingParentIds.Clear();
+            ChainReplicator.CancelAll();
             TotalBondsFormed = 0;
             TotalBondsBroken = 0;
         }
@@ -525,7 +833,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Gets the longest valid chain
         /// </summary>
-        public TokenChain GetLongestChain()
+        public TokenChain? GetLongestChain()
         {
             return ChainRegistry.GetLongestChain();
         }
@@ -533,7 +841,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Gets the most stable chain
         /// </summary>
-        public TokenChain GetMostStableChain()
+        public TokenChain? GetMostStableChain()
         {
             return ChainRegistry.GetMostStableChain();
         }
@@ -637,6 +945,9 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// </summary>
         public static IntegratedSimulationEngine RestoreFromState(SimulationState state)
         {
+            if (state?.Configuration == null)
+                throw new ArgumentException("Simulation state has no configuration", nameof(state));
+
             // Reconstruct configuration
             var config = ReconstructConfig(state.Configuration);
 
@@ -648,14 +959,18 @@ namespace DigitalBiochemicalSimulator.Simulation
             {
                 foreach (var tokenState in state.Tokens)
                 {
+                    if (!Enum.TryParse<TokenType>(tokenState.Type, out var tokenType))
+                        continue;
+
                     var token = simulation.TokenFactory.CreateToken(
-                        tokenState.Type,
-                        tokenState.Value,
+                        tokenType,
                         new Vector3Int(tokenState.Position.X, tokenState.Position.Y, tokenState.Position.Z)
                     );
 
                     if (token != null)
                     {
+                        token.Value = tokenState.Value;
+                        token.Mass = tokenState.Mass;
                         token.Energy = tokenState.Energy;
                         token.Velocity = new Vector3Int(tokenState.Velocity.X, tokenState.Velocity.Y, tokenState.Velocity.Z);
                         token.IsActive = tokenState.IsActive;
@@ -708,6 +1023,51 @@ namespace DigitalBiochemicalSimulator.Simulation
                 MaxActiveTokens = configState.MaxTokens,
                 TicksPerSecond = configState.TicksPerSecond
             };
+
+            // Fields added after the first save format are only applied when present
+            if (configState.TokenGenerationRate.HasValue) config.TokenGenerationRate = configState.TokenGenerationRate.Value;
+            if (configState.GravityStrength.HasValue) config.GravityStrength = configState.GravityStrength.Value;
+            if (configState.InitialTokenEnergy.HasValue) config.InitialTokenEnergy = configState.InitialTokenEnergy.Value;
+            if (configState.EnergyPerTick.HasValue) config.EnergyPerTick = configState.EnergyPerTick.Value;
+            if (configState.RiseRate.HasValue) config.RiseRate = configState.RiseRate.Value;
+            if (configState.FallRate.HasValue) config.FallRate = configState.FallRate.Value;
+            if (configState.GravityEnabled.HasValue) config.GravityEnabled = configState.GravityEnabled.Value;
+            if (configState.EnvironmentViscosity.HasValue) config.EnvironmentViscosity = configState.EnvironmentViscosity.Value;
+            if (configState.VentEmissionRate.HasValue) config.VentEmissionRate = configState.VentEmissionRate.Value;
+            if (configState.NumberOfVents.HasValue) config.NumberOfVents = configState.NumberOfVents.Value;
+            if (configState.VentDistribution.HasValue) config.VentDistribution = configState.VentDistribution.Value;
+            if (configState.MinBondStrength.HasValue) config.MinBondStrength = configState.MinBondStrength.Value;
+            if (configState.BondingRadius.HasValue) config.BondingRadius = configState.BondingRadius.Value;
+            if (configState.BondingRange.HasValue) config.BondingRange = configState.BondingRange.Value;
+            if (configState.EnergyPerBond.HasValue) config.EnergyPerBond = configState.EnergyPerBond.Value;
+            if (configState.CovalentBondStrength.HasValue) config.CovalentBondStrength = configState.CovalentBondStrength.Value;
+            if (configState.IonicBondStrength.HasValue) config.IonicBondStrength = configState.IonicBondStrength.Value;
+            if (configState.VanDerWaalsBondStrength.HasValue) config.VanDerWaalsBondStrength = configState.VanDerWaalsBondStrength.Value;
+            if (configState.BaseDamageRate.HasValue) config.BaseDamageRate = configState.BaseDamageRate.Value;
+            if (configState.DamageExponent.HasValue) config.DamageExponent = configState.DamageExponent.Value;
+            if (configState.CriticalDamageThreshold.HasValue) config.CriticalDamageThreshold = configState.CriticalDamageThreshold.Value;
+            if (configState.DamageIncrement.HasValue) config.DamageIncrement = configState.DamageIncrement.Value;
+            if (configState.DamageMultiplier.HasValue) config.DamageMultiplier = configState.DamageMultiplier.Value;
+            if (configState.MutationRange.HasValue) config.MutationRange = configState.MutationRange.Value;
+            if (configState.MutationRate.HasValue) config.MutationRate = configState.MutationRate.Value;
+            if (configState.MutationFalloff.HasValue) config.MutationFalloff = configState.MutationFalloff.Value;
+            if (configState.MinValidationLength.HasValue) config.MinValidationLength = configState.MinValidationLength.Value;
+            if (configState.StabilityThreshold.HasValue) config.StabilityThreshold = configState.StabilityThreshold.Value;
+            if (configState.ValidationFrequency.HasValue) config.ValidationFrequency = configState.ValidationFrequency.Value;
+            if (configState.MaxChains.HasValue) config.MaxChains = configState.MaxChains.Value;
+            if (configState.RecycleIdleTokens.HasValue) config.RecycleIdleTokens = configState.RecycleIdleTokens.Value;
+            if (configState.ReplicationRate.HasValue) config.ReplicationRate = configState.ReplicationRate.Value;
+            if (configState.ReplicationRange.HasValue) config.ReplicationRange = configState.ReplicationRange.Value;
+            if (configState.ReplicationErrorRate.HasValue) config.ReplicationErrorRate = configState.ReplicationErrorRate.Value;
+            if (configState.ReplicationInsertionRate.HasValue) config.ReplicationInsertionRate = configState.ReplicationInsertionRate.Value;
+            if (configState.ReplicationDeletionRate.HasValue) config.ReplicationDeletionRate = configState.ReplicationDeletionRate.Value;
+            if (configState.FitnessWeightedReplication.HasValue) config.FitnessWeightedReplication = configState.FitnessWeightedReplication.Value;
+            if (configState.ChainDecayRate.HasValue) config.ChainDecayRate = configState.ChainDecayRate.Value;
+            if (configState.FitnessWeightedDecay.HasValue) config.FitnessWeightedDecay = configState.FitnessWeightedDecay.Value;
+            if (configState.ReplicationTimeout.HasValue) config.ReplicationTimeout = configState.ReplicationTimeout.Value;
+            if (configState.TokenDistribution.HasValue) config.TokenDistribution = configState.TokenDistribution.Value;
+            if (configState.VentPosition != null)
+                config.VentPosition = new Vector3Int(configState.VentPosition.X, configState.VentPosition.Y, configState.VentPosition.Z);
 
             return config;
         }

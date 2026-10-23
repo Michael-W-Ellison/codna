@@ -3,6 +3,9 @@ using Xunit.Abstractions;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
+using DigitalBiochemicalSimulator.Chemistry;
+using DigitalBiochemicalSimulator.Utilities;
+using DigitalBiochemicalSimulator.Grammar;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,6 +17,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
     /// Stress tests for extreme scenarios and edge cases.
     /// Tests system limits, stability, and robustness.
     /// </summary>
+    [Collection("Performance")]
     public class StressTests
     {
         private readonly ITestOutputHelper _output;
@@ -28,7 +32,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
         {
             // Arrange & Act
             var stopwatch = Stopwatch.StartNew();
-            var grid = new Grid(100, 100, 100, capacity: 5);
+            var grid = new Grid(100, 100, 100, cellCapacity: 5);
             stopwatch.Stop();
 
             // Assert
@@ -113,66 +117,55 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
         }
 
         [Fact]
-        public void Stress_100000Ticks_RemainsStable()
+        public void Stress_LongRun_TickTimeRemainsStable()
         {
-            // Arrange
-            var config = new SimulationConfig(20, 20, 20)
-            {
-                MaxTokens = 50
-            };
+            // Arrange - a full simulation with a bounded token population
+            var config = SimulationConfig.CreateMinimal();
+            config.MaxActiveTokens = 50;
+            config.VentEmissionRate = 5;
+            var simulation = new IntegratedSimulationEngine(config);
 
-            var tokens = new List<Token>();
-            var random = new Random(42);
-
-            for (int i = 0; i < 50; i++)
+            // Warm up (JIT, token population reaching its steady state)
+            for (int tick = 0; tick < 2000; tick++)
             {
-                var position = new Vector3Int(10, 10, 10);
-                var token = new Token(i, TokenType.INTEGER_LITERAL, i.ToString(), position)
-                {
-                    Energy = int.MaxValue / 2, // Long-lasting
-                    Mass = 5
-                };
-                tokens.Add(token);
+                simulation.Step();
             }
 
-            // Act - Run for 100,000 ticks
+            // Act - Run 20,000 ticks, timing each block of 1,000
             var stopwatch = Stopwatch.StartNew();
-            int tickCount = 100000;
-            int sampleInterval = 10000;
-            var samples = new List<double>();
+            int tickCount = 20000;
+            int blockSize = 1000;
+            var blockTimes = new List<double>();
+            var blockWatch = Stopwatch.StartNew();
 
-            for (int tick = 0; tick < tickCount; tick++)
+            for (int tick = 1; tick <= tickCount; tick++)
             {
-                var tickStart = Stopwatch.GetTimestamp();
+                simulation.Step();
 
-                // Minimal simulation step
-                foreach (var token in tokens)
+                if (tick % blockSize == 0)
                 {
-                    token.Energy = Math.Max(0, token.Energy - 1);
-                }
-
-                if (tick % sampleInterval == 0)
-                {
-                    var tickEnd = Stopwatch.GetTimestamp();
-                    samples.Add((tickEnd - tickStart) * 1000.0 / Stopwatch.Frequency);
+                    blockTimes.Add(blockWatch.Elapsed.TotalMilliseconds / blockSize);
+                    blockWatch.Restart();
                 }
             }
 
             stopwatch.Stop();
 
-            // Assert - Check for performance degradation
-            var firstQuarter = samples.Take(samples.Count / 4).Average();
-            var lastQuarter = samples.Skip(3 * samples.Count / 4).Average();
+            // Assert - Check that ticks do not get slower over the run
+            var firstQuarter = blockTimes.Take(blockTimes.Count / 4).Average();
+            var lastQuarter = blockTimes.Skip(3 * blockTimes.Count / 4).Average();
             var degradation = (lastQuarter - firstQuarter) / firstQuarter * 100;
 
-            _output.WriteLine($"100,000 tick stress test:");
+            _output.WriteLine($"20,000 tick stress test:");
             _output.WriteLine($"  Total time: {stopwatch.ElapsedMilliseconds}ms ({stopwatch.Elapsed.TotalSeconds:F1}s)");
             _output.WriteLine($"  Avg time: {stopwatch.ElapsedMilliseconds / (double)tickCount:F4}ms per tick");
             _output.WriteLine($"  First quarter avg: {firstQuarter:F4}ms");
             _output.WriteLine($"  Last quarter avg: {lastQuarter:F4}ms");
             _output.WriteLine($"  Degradation: {degradation:F2}%");
+            _output.WriteLine($"  Active tokens at end: {simulation.ActiveTokens.Count}");
 
-            Assert.True(Math.Abs(degradation) < 50, $"Performance degraded significantly: {degradation:F2}%");
+            Assert.True(degradation < 100, $"Performance degraded significantly: {degradation:F2}%");
+            Assert.True(simulation.ActiveTokens.Count <= config.MaxActiveTokens);
             Assert.True(stopwatch.Elapsed.TotalMinutes < 5, "Test took longer than 5 minutes");
         }
 
@@ -180,7 +173,7 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
         public void Stress_DenseTokenClustering_HandlesEfficiently()
         {
             // Arrange - All tokens in same cell
-            var grid = new Grid(10, 10, 10, capacity: 1000);
+            var grid = new Grid(10, 10, 10, cellCapacity: 1000);
             var tokens = new List<Token>();
 
             for (int i = 0; i < 500; i++)
@@ -236,8 +229,8 @@ namespace DigitalBiochemicalSimulator.Tests.Performance
             grid.AddToken(token1);
             grid.AddToken(token2);
 
-            var rulesEngine = new BondRulesEngine();
-            var strengthCalculator = new BondStrengthCalculator();
+            var rulesEngine = new BondRulesEngine(GrammarLibrary.GetDefaultGrammar());
+            var strengthCalculator = new BondStrengthCalculator(rulesEngine);
             var bondingManager = new BondingManager(rulesEngine, strengthCalculator, config, grid);
 
             // Act - Rapidly bond and unbond

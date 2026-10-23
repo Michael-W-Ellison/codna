@@ -55,8 +55,64 @@ namespace DigitalBiochemicalSimulator.Simulation
         // Performance Configuration
         public int MaxActiveTokens { get; set; } = 1000;
         public int MaxChains { get; set; } = 200;
-        public int TickDuration { get; set; } = 100;  // milliseconds
+
+        // At MaxActiveTokens, vents replace the oldest unbonded token instead of stopping,
+        // so new material keeps arriving
+        public bool RecycleIdleTokens { get; set; } = true;
+
+        // Replication: each tick, a chain that has passed validation and is at least StabilityThreshold
+        // ticks old copies itself with this probability, from free tokens within ReplicationRange cells
+        // (0 disables replication)
+        public float ReplicationRate { get; set; } = 0.05f;
+        public int ReplicationRange { get; set; } = 2;
+
+        // Probability that a copy takes a token of a different type at one position (copying error)
+        public float ReplicationErrorRate { get; set; } = 0.05f;
+
+        // Probability that a copy duplicates a run of 1-2 positions (insertion) or leaves one out (deletion)
+        public float ReplicationInsertionRate { get; set; } = 0.05f;
+        public float ReplicationDeletionRate { get; set; } = 0.05f;
+
+        // Fitter chains (ChainFitness) replicate proportionally more often; the average rate stays ReplicationRate
+        public bool FitnessWeightedReplication { get; set; } = true;
+
+        // Chain turnover: chance per tick that a chain breaks down and returns its tokens (0 = never;
+        // 0.0005 gives an average chain life of about 2000 ticks)
+        public float ChainDecayRate { get; set; } = 0.0005f;
+
+        // Fitter chains (ChainFitness) decay proportionally more slowly; an average chain decays at ChainDecayRate
+        public bool FitnessWeightedDecay { get; set; } = true;
+
+        // Ticks a copy may spend gathering tokens before it is abandoned and its tokens released
+        public int ReplicationTimeout { get; set; } = 100;
         public int TicksPerSecond { get; set; } = 10;
+        public int TickDuration => TicksPerSecond > 0 ? 1000 / TicksPerSecond : 1000;  // milliseconds, from TicksPerSecond
+
+        /// <summary>
+        /// Alias for MaxActiveTokens
+        /// </summary>
+        public int MaxTokens
+        {
+            get => MaxActiveTokens;
+            set => MaxActiveTokens = value;
+        }
+
+        // Tokens each vent emits per emission (every VentEmissionRate ticks)
+        public int TokenGenerationRate { get; set; } = 1;
+
+        // Multiplier on FallRate for falling tokens (fractional cells per tick are applied probabilistically)
+        public float GravityStrength { get; set; } = 1.0f;
+
+        // Euclidean distance in cells within which tokens in different cells can bond (0 = same cell only)
+        public float BondingRange { get; set; } = 0.0f;
+
+        // Multiplier on BaseDamageRate
+        public float DamageMultiplier { get; set; } = 1.0f;
+
+        /// <summary>
+        /// Bonding distance used by the simulation: the larger of BondingRadius and BondingRange
+        /// </summary>
+        public float EffectiveBondingRange => Math.Max(BondingRadius, BondingRange);
 
         // Token Distribution (probabilities for each token category)
         public TokenDistributionProfile TokenDistribution { get; set; } =
@@ -74,6 +130,26 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
+        /// Creates a configuration with the given grid dimensions and default values
+        /// </summary>
+        public SimulationConfig(int gridWidth, int gridHeight, int gridDepth)
+        {
+            GridWidth = gridWidth;
+            GridHeight = gridHeight;
+            GridDepth = gridDepth;
+        }
+
+        /// <summary>
+        /// Creates a configuration from the Standard preset
+        /// </summary>
+        public static SimulationConfig CreateStandard() => SimulationPresets.Standard;
+
+        /// <summary>
+        /// Creates a configuration from the Minimal preset
+        /// </summary>
+        public static SimulationConfig CreateMinimal() => SimulationPresets.Minimal;
+
+        /// <summary>
         /// Creates a copy of this configuration
         /// </summary>
         public SimulationConfig Clone()
@@ -89,7 +165,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             // Validate positive dimensions
             if (GridWidth <= 0 || GridHeight <= 0 || GridDepth <= 0)
             {
-                errorMessage = "Grid dimensions must be positive";
+                errorMessage = $"Grid width, height, and depth must be positive (current: {GridWidth}×{GridHeight}×{GridDepth})";
                 return false;
             }
 
@@ -97,7 +173,7 @@ namespace DigitalBiochemicalSimulator.Simulation
             const int MAX_DIMENSION = 1000;
             if (GridWidth > MAX_DIMENSION || GridHeight > MAX_DIMENSION || GridDepth > MAX_DIMENSION)
             {
-                errorMessage = $"Grid dimensions cannot exceed {MAX_DIMENSION} (current: {GridWidth}×{GridHeight}×{GridDepth})";
+                errorMessage = $"Grid is too large: dimensions cannot exceed {MAX_DIMENSION} (current: {GridWidth}×{GridHeight}×{GridDepth})";
                 return false;
             }
 
@@ -226,6 +302,69 @@ namespace DigitalBiochemicalSimulator.Simulation
             if (MaxChains < 0)
             {
                 errorMessage = "Max chains cannot be negative";
+                return false;
+            }
+
+            if (TokenGenerationRate <= 0)
+            {
+                errorMessage = "Token generation rate must be positive";
+                return false;
+            }
+
+            if (GravityStrength < 0.0f)
+            {
+                errorMessage = "Gravity strength cannot be negative";
+                return false;
+            }
+
+            if (BondingRadius < 0 || BondingRange < 0.0f)
+            {
+                errorMessage = "Bonding radius and range cannot be negative";
+                return false;
+            }
+
+            if (DamageMultiplier < 0.0f)
+            {
+                errorMessage = "Damage multiplier cannot be negative";
+                return false;
+            }
+
+            if (DamageIncrement < 0.0f || DamageIncrement > 1.0f)
+            {
+                errorMessage = "Damage increment must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ReplicationRate < 0.0f || ReplicationRate > 1.0f ||
+                ReplicationErrorRate < 0.0f || ReplicationErrorRate > 1.0f ||
+                ReplicationInsertionRate < 0.0f || ReplicationInsertionRate > 1.0f ||
+                ReplicationDeletionRate < 0.0f || ReplicationDeletionRate > 1.0f)
+            {
+                errorMessage = "Replication rate and replication error, insertion and deletion rates must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ChainDecayRate < 0.0f || ChainDecayRate > 1.0f)
+            {
+                errorMessage = "Chain decay rate must be between 0.0 and 1.0";
+                return false;
+            }
+
+            if (ReplicationTimeout < 1)
+            {
+                errorMessage = "Replication timeout must be at least 1 tick";
+                return false;
+            }
+
+            if (ReplicationRange < 0 || ReplicationRange > 10)
+            {
+                errorMessage = "Replication range must be between 0 and 10";
+                return false;
+            }
+
+            if (MinValidationLength < 0 || StabilityThreshold < 0 || ValidationFrequency < 0)
+            {
+                errorMessage = "Validation settings cannot be negative";
                 return false;
             }
 

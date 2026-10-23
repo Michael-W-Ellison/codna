@@ -240,14 +240,14 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
             // Get neighboring cells (8 horizontal neighbors)
             var neighbors = _grid.GetNeighbors(currentCell.Position)
-                .Where(n => n.Position.Y == currentCell.Position.Y) // Same altitude
+                .Where(n => n.Position.Z == currentCell.Position.Z) // Same altitude
                 .ToList();
 
             if (neighbors.Count == 0)
                 return; // No neighbors available
 
             // Find the least crowded neighbor
-            Cell targetCell = FindLeastCrowdedCell(neighbors);
+            Cell? targetCell = FindLeastCrowdedCell(neighbors);
 
             if (targetCell == null)
                 return; // All neighbors full
@@ -265,12 +265,12 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the least crowded neighboring cell
         /// </summary>
-        private Cell FindLeastCrowdedCell(List<Cell> cells)
+        private Cell? FindLeastCrowdedCell(List<Cell> cells)
         {
             if (cells == null || cells.Count == 0)
                 return null;
 
-            Cell leastCrowded = null;
+            Cell? leastCrowded = null;
             int minCount = int.MaxValue;
 
             foreach (var cell in cells)

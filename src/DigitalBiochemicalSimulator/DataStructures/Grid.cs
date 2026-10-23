@@ -18,6 +18,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public int Width => Dimensions.X;
         public int Height => Dimensions.Y;
         public int Depth => Dimensions.Z;
+        public int CellCapacity { get; private set; }
 
         private Cell[,,] _cells;
         private readonly ConcurrentDictionary<Vector3Int, byte> _activeCells;
@@ -26,6 +27,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
         public Grid(int width, int height, int depth, int cellCapacity = 1000)
         {
             Dimensions = new Vector3Int(width, height, depth);
+            CellCapacity = cellCapacity;
             _cells = new Cell[width, height, depth];
             _activeCells = new ConcurrentDictionary<Vector3Int, byte>();
             _cellLock = new ReaderWriterLockSlim();
@@ -144,7 +146,9 @@ namespace DigitalBiochemicalSimulator.DataStructures
         /// <summary>
         /// Moves a token from one position to another (thread-safe)
         /// </summary>
-        public bool MoveToken(Token token, Vector3Int newPosition)
+        /// <param name="allowOverflow">Move even if the destination is at capacity
+        /// (used when spreading overflow from a heavier cell)</param>
+        public bool MoveToken(Token token, Vector3Int newPosition, bool allowOverflow = false)
         {
             if (token == null)
                 return false;
@@ -159,7 +163,7 @@ namespace DigitalBiochemicalSimulator.DataStructures
                 var newCell = _cells[newPosition.X, newPosition.Y, newPosition.Z];
 
                 // Check if new cell can accept the token
-                if (!newCell.CanAcceptToken(token))
+                if (!allowOverflow && !newCell.CanAcceptToken(token))
                     return false;
 
                 // Move the token

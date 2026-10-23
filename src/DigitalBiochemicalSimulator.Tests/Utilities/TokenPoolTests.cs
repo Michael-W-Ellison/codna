@@ -110,7 +110,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             int initialAvailable = pool.AvailableCount;
 
             // Act
-            pool.ReleaseToken(null);
+            pool.ReleaseToken(null!);
 
             // Assert
             Assert.Equal(initialAvailable, pool.AvailableCount);
@@ -173,8 +173,8 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
         [Fact]
         public void TokenReuse_ClearsAllState()
         {
-            // Arrange
-            var pool = new TokenPool(initialSize: 5);
+            // Arrange - an empty pool, so the released token is the next one handed out
+            var pool = new TokenPool(initialSize: 0);
             var token = pool.GetToken(TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero);
 
             // Modify token state
@@ -269,8 +269,8 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
         [Fact]
         public void TokenPool_ResetToken_GeneratesNewGuid()
         {
-            // Arrange
-            var pool = new TokenPool(initialSize: 5);
+            // Arrange - an empty pool, so the released token is the next one handed out
+            var pool = new TokenPool(initialSize: 0);
             var token = pool.GetToken(TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero);
             var firstId = token.Id;
 
@@ -295,7 +295,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             token.BondedTokens.Add(otherToken);
             if (token.BondSites.Count > 0)
             {
-                token.BondSites[0].BondTo(otherToken, 0);
+                token.BondSites[0].FormBond(otherToken, 0);
             }
 
             // Act
@@ -305,7 +305,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             Assert.Empty(token.BondedTokens);
             foreach (var site in token.BondSites)
             {
-                Assert.False(site.IsBonded);
+                Assert.False(site.IsOccupied);
             }
         }
 
@@ -339,8 +339,8 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
                 pool.ReleaseToken(token);
             }
 
-            // Assert - Pool size should be stable
-            Assert.Equal(50, pool.AvailableCount);
+            // Assert - Pool size should be stable (each released token is reused, so the pool never grows)
+            Assert.Equal(10, pool.AvailableCount);
             Assert.Equal(0, pool.ActiveCount);
         }
     }

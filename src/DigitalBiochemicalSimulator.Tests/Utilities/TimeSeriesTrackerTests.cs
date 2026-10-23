@@ -46,6 +46,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
 
             // Assert
             var series = tracker.GetSeries("population");
+            Assert.NotNull(series);
             Assert.Equal(10, series.Count);
         }
 
@@ -106,6 +107,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var stats = tracker.GetStatistics("metric");
 
             // Assert
+            Assert.NotNull(stats);
             Assert.Equal(5, stats.Count);
             Assert.Equal(10, stats.Min);
             Assert.Equal(50, stats.Max);
@@ -130,6 +132,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var trend = tracker.AnalyzeTrend("growth");
 
             // Assert
+            Assert.NotNull(trend);
             Assert.Equal(TrendDirection.Increasing, trend.Trend);
             Assert.True(trend.Slope > 0);
         }
@@ -150,6 +153,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var trend = tracker.AnalyzeTrend("decline");
 
             // Assert
+            Assert.NotNull(trend);
             Assert.Equal(TrendDirection.Decreasing, trend.Trend);
             Assert.True(trend.Slope < 0);
         }
@@ -170,6 +174,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var trend = tracker.AnalyzeTrend("stable");
 
             // Assert
+            Assert.NotNull(trend);
             Assert.Equal(TrendDirection.Stable, trend.Trend);
             Assert.True(Math.Abs(trend.Slope) < 0.01);
         }
@@ -257,6 +262,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             // Assert
             Assert.Equal(100, tracker.GetLatestValue("keep"));
             var removedSeries = tracker.GetSeries("remove");
+            Assert.NotNull(removedSeries);
             Assert.Equal(0, removedSeries.Count);
         }
 
@@ -276,6 +282,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
 
             // Assert
             var series = tracker.GetSeries("metric");
+            Assert.NotNull(series);
             var all = series.GetAll();
             Assert.True(all.All(p => p.Tick >= 50));
         }
@@ -294,10 +301,12 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
 
             // Assert
             var series = tracker.GetSeries("limited");
+            Assert.NotNull(series);
             Assert.True(series.Count <= 10);
 
             // Should have most recent data
             var latest = series.GetLatest();
+            Assert.NotNull(latest);
             Assert.Equal(19, latest.Value);
         }
 
@@ -313,6 +322,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var stats = tracker.GetStatistics("growth");
 
             // Assert
+            Assert.NotNull(stats);
             Assert.Equal(50, stats.TotalChange);
             Assert.Equal(50, stats.PercentChange); // 50% increase
         }
@@ -327,6 +337,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
 
             // Act
             var series = tracker.GetSeries("test");
+            Assert.NotNull(series);
             var value = series.GetValueAtTick(5);
 
             // Assert
@@ -348,6 +359,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var stats = tracker.GetStatistics("range_test", startTick: 25, endTick: 75);
 
             // Assert
+            Assert.NotNull(stats);
             Assert.Equal(51, stats.Count);
             Assert.Equal(25, stats.FirstValue);
             Assert.Equal(75, stats.LastValue);
@@ -368,6 +380,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var trend = tracker.AnalyzeTrend("windowed", windowSize: 50);
 
             // Assert
+            Assert.NotNull(trend);
             Assert.Equal(50, trend.WindowSize);
         }
 

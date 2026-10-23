@@ -64,7 +64,7 @@ namespace DigitalBiochemicalSimulator.Utilities
         /// <summary>
         /// Gets a time series by name
         /// </summary>
-        public TimeSeries GetSeries(string metricName)
+        public TimeSeries? GetSeries(string metricName)
         {
             return _series.TryGetValue(metricName, out var series) ? series : null;
         }
@@ -98,7 +98,7 @@ namespace DigitalBiochemicalSimulator.Utilities
         /// <summary>
         /// Gets statistics for a metric over a time range
         /// </summary>
-        public MetricStatistics GetStatistics(string metricName, long? startTick = null, long? endTick = null)
+        public MetricStatistics? GetStatistics(string metricName, long? startTick = null, long? endTick = null)
         {
             var series = GetSeries(metricName);
             return series?.CalculateStatistics(startTick, endTick);
@@ -107,7 +107,7 @@ namespace DigitalBiochemicalSimulator.Utilities
         /// <summary>
         /// Detects trends in a metric
         /// </summary>
-        public TrendAnalysis AnalyzeTrend(string metricName, int windowSize = 100)
+        public TrendAnalysis? AnalyzeTrend(string metricName, int windowSize = 100)
         {
             var series = GetSeries(metricName);
             return series?.AnalyzeTrend(windowSize);
@@ -265,7 +265,7 @@ namespace DigitalBiochemicalSimulator.Utilities
             _data.Add(new DataPoint(tick, value));
         }
 
-        public DataPoint GetLatest()
+        public DataPoint? GetLatest()
         {
             return _data.Count > 0 ? _data.GetLast() : null;
         }
@@ -417,7 +417,7 @@ namespace DigitalBiochemicalSimulator.Utilities
     /// </summary>
     public class MetricStatistics
     {
-        public string MetricName { get; set; }
+        public string MetricName { get; set; } = string.Empty;
         public int Count { get; set; }
         public double Min { get; set; }
         public double Max { get; set; }
@@ -509,7 +509,7 @@ namespace DigitalBiochemicalSimulator.Utilities
             }
         }
 
-        public T GetLast()
+        public T? GetLast()
         {
             if (_count == 0)
                 return default(T);
@@ -543,7 +543,7 @@ namespace DigitalBiochemicalSimulator.Utilities
             }
         }
 
-        public T FirstOrDefault(Func<T, bool> predicate)
+        public T? FirstOrDefault(Func<T, bool> predicate)
         {
             for (int i = 0; i < _count; i++)
             {

@@ -43,11 +43,11 @@ namespace DigitalBiochemicalSimulator.Grammar
             _variableTypes.Clear();
             _declaredVariables.Clear();
 
+            // Validate variable declarations and usage (first, so declared types are known below)
+            ValidateVariableUsage(chain, result);
+
             // Validate type compatibility in expressions
             ValidateTypeCompatibility(chain, result);
-
-            // Validate variable declarations and usage
-            ValidateVariableUsage(chain, result);
 
             // Validate operator usage
             ValidateOperators(chain, result);
@@ -125,9 +125,10 @@ namespace DigitalBiochemicalSimulator.Grammar
                 var token = chain.Tokens[i];
 
                 // Check for variable declarations (e.g., "int x = 5")
-                if (token.Type == TokenType.KEYWORD_INT ||
-                    token.Type == TokenType.KEYWORD_FLOAT ||
-                    token.Type == TokenType.KEYWORD_BOOL)
+                if (token.Type == TokenType.TYPE_INT ||
+                    token.Type == TokenType.TYPE_FLOAT ||
+                    token.Type == TokenType.TYPE_BOOL ||
+                    token.Type == TokenType.TYPE_STRING)
                 {
                     if (i + 1 < chain.Tokens.Count)
                     {
@@ -180,6 +181,23 @@ namespace DigitalBiochemicalSimulator.Grammar
                     {
                         result.Errors.Add($"Operator '{token.Value}' at position {i} missing operands");
                         result.IsValid = false;
+                        continue;
+                    }
+
+                    // Division or modulo by a literal zero
+                    if ((token.Type == TokenType.OPERATOR_DIVIDE || token.Type == TokenType.OPERATOR_MODULO ||
+                         token.Type == TokenType.OPERATOR_DIVIDE_ASSIGN) &&
+                        IsLiteralZero(chain.Tokens[i + 1]))
+                    {
+                        result.Errors.Add($"Division by zero at position {i}");
+                        result.IsValid = false;
+                    }
+
+                    // Assignment needs a variable on its left
+                    if (IsAssignmentOperator(token) && chain.Tokens[i - 1].Type != TokenType.IDENTIFIER)
+                    {
+                        result.Errors.Add($"Assignment '{token.Value}' at position {i} has no variable on its left");
+                        result.IsValid = false;
                     }
                 }
             }
@@ -197,7 +215,7 @@ namespace DigitalBiochemicalSimulator.Grammar
                 if (token.Type == TokenType.KEYWORD_IF || token.Type == TokenType.KEYWORD_WHILE)
                 {
                     // Check for condition (should have parentheses)
-                    if (i + 1 >= chain.Tokens.Count || chain.Tokens[i + 1].Type != TokenType.LPAREN)
+                    if (i + 1 >= chain.Tokens.Count || chain.Tokens[i + 1].Type != TokenType.PAREN_OPEN)
                     {
                         result.Errors.Add($"'{token.Value}' at position {i} missing condition in parentheses");
                         result.IsValid = false;
@@ -223,7 +241,7 @@ namespace DigitalBiochemicalSimulator.Grammar
                 }
 
                 var nextToken = tokens[index + 1];
-                if (nextToken.Type != TokenType.IDENTIFIER && nextToken.Type != TokenType.LPAREN)
+                if (nextToken.Type != TokenType.IDENTIFIER && nextToken.Type != TokenType.PAREN_OPEN)
                 {
                     result.Warnings.Add($"Type keyword '{token.Value}' at position {index} has unusual usage");
                 }
@@ -246,7 +264,9 @@ namespace DigitalBiochemicalSimulator.Grammar
             if (token.Type == TokenType.STRING_LITERAL)
                 return "string";
 
-            if (token.Type == TokenType.BOOLEAN_LITERAL)
+            if (token.Type == TokenType.BOOLEAN_LITERAL ||
+                token.Type == TokenType.KEYWORD_TRUE ||
+                token.Type == TokenType.KEYWORD_FALSE)
                 return "bool";
 
             if (token.Type == TokenType.IDENTIFIER)
@@ -269,10 +289,10 @@ namespace DigitalBiochemicalSimulator.Grammar
         {
             return type switch
             {
-                TokenType.KEYWORD_INT => "int",
-                TokenType.KEYWORD_FLOAT => "float",
-                TokenType.KEYWORD_BOOL => "bool",
-                TokenType.KEYWORD_STRING => "string",
+                TokenType.TYPE_INT => "int",
+                TokenType.TYPE_FLOAT => "float",
+                TokenType.TYPE_BOOL => "bool",
+                TokenType.TYPE_STRING => "string",
                 _ => "unknown"
             };
         }
@@ -308,7 +328,9 @@ namespace DigitalBiochemicalSimulator.Grammar
             if (operatorToken.Type == TokenType.OPERATOR_EQUALS ||
                 operatorToken.Type == TokenType.OPERATOR_NOT_EQUALS ||
                 operatorToken.Type == TokenType.OPERATOR_LESS_THAN ||
-                operatorToken.Type == TokenType.OPERATOR_GREATER_THAN)
+                operatorToken.Type == TokenType.OPERATOR_GREATER_THAN ||
+                operatorToken.Type == TokenType.OPERATOR_LESS_THAN_OR_EQUAL ||
+                operatorToken.Type == TokenType.OPERATOR_GREATER_THAN_OR_EQUAL)
             {
                 // Same types can be compared
                 if (leftType == rightType)
@@ -319,6 +341,14 @@ namespace DigitalBiochemicalSimulator.Grammar
                     return true;
 
                 return false;
+            }
+
+            // Assignment: the value must suit the variable's declared type
+            if (IsAssignmentOperator(operatorToken))
+            {
+                if (leftType == rightType)
+                    return true;
+                return IsNumericType(leftType) && IsNumericType(rightType);
             }
 
             // Logical operators
@@ -354,8 +384,29 @@ namespace DigitalBiochemicalSimulator.Grammar
                    token.Type == TokenType.OPERATOR_NOT_EQUALS ||
                    token.Type == TokenType.OPERATOR_LESS_THAN ||
                    token.Type == TokenType.OPERATOR_GREATER_THAN ||
+                   token.Type == TokenType.OPERATOR_LESS_THAN_OR_EQUAL ||
+                   token.Type == TokenType.OPERATOR_GREATER_THAN_OR_EQUAL ||
+                   token.Type == TokenType.OPERATOR_POWER ||
                    token.Type == TokenType.OPERATOR_AND ||
-                   token.Type == TokenType.OPERATOR_OR;
+                   token.Type == TokenType.OPERATOR_OR ||
+                   IsAssignmentOperator(token);
+        }
+
+        private static bool IsAssignmentOperator(Token token)
+        {
+            return token.Type == TokenType.OPERATOR_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_PLUS_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_MINUS_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_MULTIPLY_ASSIGN ||
+                   token.Type == TokenType.OPERATOR_DIVIDE_ASSIGN;
+        }
+
+        private static bool IsLiteralZero(Token token)
+        {
+            return (token.Type == TokenType.INTEGER_LITERAL || token.Type == TokenType.FLOAT_LITERAL) &&
+                   double.TryParse(token.Value, System.Globalization.NumberStyles.Float,
+                       System.Globalization.CultureInfo.InvariantCulture, out var value) &&
+                   value == 0;
         }
 
         /// <summary>
@@ -374,10 +425,10 @@ namespace DigitalBiochemicalSimulator.Grammar
         /// </summary>
         private bool IsTypeKeyword(Token token)
         {
-            return token.Type == TokenType.KEYWORD_INT ||
-                   token.Type == TokenType.KEYWORD_FLOAT ||
-                   token.Type == TokenType.KEYWORD_BOOL ||
-                   token.Type == TokenType.KEYWORD_STRING;
+            return token.Type == TokenType.TYPE_INT ||
+                   token.Type == TokenType.TYPE_FLOAT ||
+                   token.Type == TokenType.TYPE_BOOL ||
+                   token.Type == TokenType.TYPE_STRING;
         }
 
         /// <summary>

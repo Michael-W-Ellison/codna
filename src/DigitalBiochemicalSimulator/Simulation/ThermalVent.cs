@@ -17,6 +17,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         public int EmissionRate { get; set; } // Tokens per N ticks
         public Dictionary<TokenType, float> TokenDistribution { get; set; }
         public int InitialEnergy { get; set; }
+        public int TokensPerEmission { get; set; } = 1; // Tokens emitted each time the vent fires
 
         private TokenFactory _tokenFactory;
         private Random _random;
@@ -41,6 +42,26 @@ namespace DigitalBiochemicalSimulator.Simulation
         }
 
         /// <summary>
+        /// Generates TokensPerEmission tokens if enough ticks have passed, otherwise none
+        /// </summary>
+        public List<Token> GenerateTokens(long currentTick)
+        {
+            var tokens = new List<Token>();
+            if (currentTick - _lastEmissionTick < EmissionRate)
+                return tokens;
+
+            _lastEmissionTick = currentTick;
+
+            for (int i = 0; i < TokensPerEmission; i++)
+            {
+                _tokensGenerated++;
+                tokens.Add(_tokenFactory.CreateToken(SelectWeightedRandomToken(), Position, InitialEnergy));
+            }
+
+            return tokens;
+        }
+
+        /// <summary>
         /// Attempts to generate a token if enough ticks have passed
         /// </summary>
         public Token? GenerateToken(long currentTick)
@@ -60,7 +81,7 @@ namespace DigitalBiochemicalSimulator.Simulation
         /// <summary>
         /// Selects a random token type based on weighted distribution
         /// </summary>
-        private TokenType SelectWeightedRandom Token()
+        private TokenType SelectWeightedRandomToken()
         {
             if (TokenDistribution.Count == 0)
                 return TokenType.IDENTIFIER;

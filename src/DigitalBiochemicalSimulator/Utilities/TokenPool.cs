@@ -188,6 +188,8 @@ namespace DigitalBiochemicalSimulator.Utilities
                 site.BreakBond();
             }
             token.ChainHead = null;
+            token.ChainId = 0;
+            token.ReservedBy = 0;
             token.ChainPosition = 0;
 
             // Reset state
@@ -209,6 +211,7 @@ namespace DigitalBiochemicalSimulator.Utilities
                 site.BreakBond();
             }
             token.ChainHead = null;
+            token.ReservedBy = 0;
             token.IsActive = false;
         }
 

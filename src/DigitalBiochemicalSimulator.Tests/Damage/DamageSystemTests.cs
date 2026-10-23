@@ -14,12 +14,13 @@ namespace DigitalBiochemicalSimulator.Tests.Damage
         [Fact]
         public void DamageSystem_ApplyDamage_IncreasesDamageLevelOverTime()
         {
-            // Arrange
+            // Arrange - damage certain at the top layer so the result does not depend on chance
             var config = SimulationConfig.CreateStandard();
+            config.BaseDamageRate = 1.0f;
             var bondingManager = CreateBondingManager(config);
             var damageSystem = new DamageSystem(config, bondingManager);
 
-            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(5, config.GridHeight - 1, 5))
+            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(5, 5, config.GridDepth - 1))
             {
                 Energy = 50,
                 IsActive = true,
@@ -51,7 +52,7 @@ namespace DigitalBiochemicalSimulator.Tests.Damage
                 DamageLevel = 0.0f
             };
 
-            var highToken = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(5, config.GridHeight - 1, 5))
+            var highToken = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(5, 5, config.GridDepth - 1))
             {
                 Energy = 50,
                 IsActive = true,

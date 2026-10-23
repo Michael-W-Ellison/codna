@@ -4,6 +4,7 @@ using Xunit;
 using DigitalBiochemicalSimulator.Analytics;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.Chemistry;
+using DigitalBiochemicalSimulator.DataStructures;
 
 namespace DigitalBiochemicalSimulator.Tests.Analytics
 {
@@ -42,7 +43,7 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var tracker = new EvolutionTracker();
 
             // Act
-            tracker.RecordChainFormation(null, tick: 100);
+            tracker.RecordChainFormation(null!, tick: 100);
 
             // Assert
             Assert.Equal(0, tracker.LineageCount);
@@ -122,7 +123,7 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var tracker = new EvolutionTracker();
 
             // Act
-            var fitness = tracker.CalculateFitness(null, currentTick: 100);
+            var fitness = tracker.CalculateFitness(null!, currentTick: 100);
 
             // Assert
             Assert.Equal(0, fitness);
@@ -296,6 +297,9 @@ namespace DigitalBiochemicalSimulator.Tests.Analytics
             var chain = new TokenChain(tokens[0]);
             for (int i = 1; i < tokens.Count; i++)
             {
+                // TokenChain.AddToken only accepts tokens bonded to the chain end
+                tokens[i - 1].BondedTokens.Add(tokens[i]);
+                tokens[i].BondedTokens.Add(tokens[i - 1]);
                 chain.AddToken(tokens[i]);
             }
 

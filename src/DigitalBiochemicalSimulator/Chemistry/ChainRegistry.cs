@@ -21,7 +21,6 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
         // Stability thresholds
         private const float STABILITY_THRESHOLD = 0.5f;      // Minimum to be considered "stable"
-        private const float UNSTABLE_THRESHOLD = 0.2f;       // Below this = remove from registry
         private const long STABLE_AGE_REQUIREMENT = 50;      // Ticks before chain can be "stable"
 
         public ChainRegistry(ChainStabilityCalculator stabilityCalculator)
@@ -33,24 +32,37 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Registers a new chain (thread-safe)
+        /// Registers a chain (thread-safe). A chain that already has an ID keeps it and
+        /// replaces any registered chain with the same ID; a chain with no ID (0) is assigned one.
         /// </summary>
         public long RegisterChain(TokenChain chain)
         {
             if (chain == null)
                 return -1;
 
-            long id = System.Threading.Interlocked.Increment(ref _nextChainId);
-            chain.Id = id;
-            _chains[id] = chain;
+            lock (_registryLock)
+            {
+                if (chain.Id <= 0)
+                {
+                    chain.Id = _nextChainId++;
+                    while (_chains.ContainsKey(chain.Id))
+                        chain.Id = _nextChainId++;
+                }
+                else if (chain.Id >= _nextChainId)
+                {
+                    _nextChainId = chain.Id + 1;
+                }
 
-            return id;
+                _chains[chain.Id] = chain;
+            }
+
+            return chain.Id;
         }
 
         /// <summary>
         /// Gets a chain by ID (thread-safe)
         /// </summary>
-        public TokenChain GetChain(long id)
+        public TokenChain? GetChain(long id)
         {
             return _chains.TryGetValue(id, out var chain) ? chain : null;
         }
@@ -72,34 +84,16 @@ namespace DigitalBiochemicalSimulator.Chemistry
         }
 
         /// <summary>
-        /// Updates stability scores for all chains (thread-safe)
+        /// Updates stability scores and stable status for all chains (thread-safe).
+        /// Stability classifies chains; it does not remove them (chains break through
+        /// validation failure or critical damage, design spec sections 3.5.3 and 3.6).
         /// </summary>
         public void UpdateAllStabilities(long currentTick)
         {
-            var chainsToRemove = new List<long>();
-
-            foreach (var kvp in _chains)
+            foreach (var chain in _chains.Values)
             {
-                var chain = kvp.Value;
-
-                // Calculate stability
-                float stability = _stabilityCalculator?.CalculateStability(chain, currentTick) ?? 0.5f;
-                chain.StabilityScore = stability;
-
-                // Update stable chains list
+                chain.StabilityScore = _stabilityCalculator?.CalculateStability(chain, currentTick) ?? 0.5f;
                 UpdateStableStatus(chain, currentTick);
-
-                // Mark extremely unstable chains for removal
-                if (stability < UNSTABLE_THRESHOLD)
-                {
-                    chainsToRemove.Add(kvp.Key);
-                }
-            }
-
-            // Remove unstable chains
-            foreach (var id in chainsToRemove)
-            {
-                RemoveChain(id);
             }
         }
 
@@ -178,7 +172,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the longest chain
         /// </summary>
-        public TokenChain GetLongestChain()
+        public TokenChain? GetLongestChain()
         {
             return _chains.Values
                 .OrderByDescending(c => c.Length)
@@ -188,7 +182,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
         /// <summary>
         /// Finds the most stable chain
         /// </summary>
-        public TokenChain GetMostStableChain()
+        public TokenChain? GetMostStableChain()
         {
             return _chains.Values
                 .OrderByDescending(c => c.StabilityScore)

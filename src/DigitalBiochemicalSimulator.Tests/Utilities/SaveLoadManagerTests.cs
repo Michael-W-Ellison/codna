@@ -1,4 +1,5 @@
 using Xunit;
+using DigitalBiochemicalSimulator.Tests.TestHelpers;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.DataStructures;
 using DigitalBiochemicalSimulator.Simulation;
@@ -86,6 +87,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             // Act
             manager.Save(state, "token_test");
             var loadedState = manager.Load("token_test").State;
+            Assert.NotNull(loadedState);
             var loadedToken = loadedState.Tokens[0];
 
             // Assert
@@ -112,6 +114,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             // Act
             manager.Save(state, "chain_test");
             var loadedState = manager.Load("chain_test").State;
+            Assert.NotNull(loadedState);
             var loadedChain = loadedState.Chains[0];
 
             // Assert
@@ -150,10 +153,11 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var manager = new SaveLoadManager(_testDirectory);
 
             // Act
-            var result = manager.Save(null, "null_test");
+            var result = manager.Save(null!, "null_test");
 
             // Assert
             Assert.False(result.Success);
+            Assert.NotNull(result.ErrorMessage);
             Assert.Contains("null", result.ErrorMessage.ToLower());
 
             // Cleanup
@@ -254,7 +258,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
         }
 
         [Fact]
-        public async void SaveLoadManager_SaveAsync_CreatesFile()
+        public async Task SaveLoadManager_SaveAsync_CreatesFile()
         {
             // Arrange
             var manager = new SaveLoadManager(_testDirectory);
@@ -272,7 +276,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
         }
 
         [Fact]
-        public async void SaveLoadManager_LoadAsync_ReturnsCorrectState()
+        public async Task SaveLoadManager_LoadAsync_ReturnsCorrectState()
         {
             // Arrange
             var manager = new SaveLoadManager(_testDirectory);
@@ -379,8 +383,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
             var token2 = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
 
-            var chain = new TokenChain(token1);
-            chain.AddToken(token2, atTail: true);
+            var chain = TestChains.Build(token1, token2);
             chain.StabilityScore = 0.85f;
             chain.IsValid = true;
 
@@ -405,9 +408,7 @@ namespace DigitalBiochemicalSimulator.Tests.Utilities
                 new Token(3, TokenType.INTEGER_LITERAL, "3", new Vector3Int(5, 5, 5))
             };
 
-            var chain = new TokenChain(tokens[0]);
-            chain.AddToken(tokens[1], atTail: true);
-            chain.AddToken(tokens[2], atTail: true);
+            var chain = TestChains.Build(tokens[0], tokens[1], tokens[2]);
 
             var grid = new Grid(10, 10, 10);
 

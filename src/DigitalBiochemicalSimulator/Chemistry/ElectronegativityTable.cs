@@ -73,28 +73,17 @@ namespace DigitalBiochemicalSimulator.Chemistry
             AddValue(TokenType.TYPE_BOOL, 0.90f);
             AddValue(TokenType.TYPE_VOID, 0.90f);
             AddValue(TokenType.TYPE_OBJECT, 0.90f);
-            AddValue(TokenType.TYPE_ARRAY, 0.90f);
-            AddValue(TokenType.TYPE_CHAR, 0.90f);
-            AddValue(TokenType.TYPE_DOUBLE, 0.90f);
-            AddValue(TokenType.TYPE_LONG, 0.90f);
 
             // Control Flow Keywords - strongly attract conditions and blocks
             AddValue(TokenType.KEYWORD_IF, 0.85f);
             AddValue(TokenType.KEYWORD_ELSE, 0.85f);
             AddValue(TokenType.KEYWORD_WHILE, 0.85f);
             AddValue(TokenType.KEYWORD_FOR, 0.85f);
-            AddValue(TokenType.KEYWORD_SWITCH, 0.85f);
-            AddValue(TokenType.KEYWORD_CASE, 0.85f);
-            AddValue(TokenType.KEYWORD_DEFAULT, 0.85f);
-            AddValue(TokenType.KEYWORD_BREAK, 0.80f);
-            AddValue(TokenType.KEYWORD_CONTINUE, 0.80f);
             AddValue(TokenType.KEYWORD_RETURN, 0.80f);
 
             // Definition Keywords - strongly attract identifiers
             AddValue(TokenType.KEYWORD_FUNCTION, 0.88f);
             AddValue(TokenType.KEYWORD_CLASS, 0.88f);
-            AddValue(TokenType.KEYWORD_INTERFACE, 0.88f);
-            AddValue(TokenType.KEYWORD_ENUM, 0.88f);
 
             // Declaration Keywords
             AddValue(TokenType.KEYWORD_VAR, 0.82f);
@@ -141,18 +130,10 @@ namespace DigitalBiochemicalSimulator.Chemistry
 
             // Access Operators
             AddValue(TokenType.DOT, 0.75f); // Member access is strong
-            AddValue(TokenType.ARROW, 0.75f);
 
             // Other Keywords
             AddValue(TokenType.KEYWORD_NEW, 0.65f);
             AddValue(TokenType.KEYWORD_THIS, 0.60f);
-            AddValue(TokenType.KEYWORD_SUPER, 0.60f);
-            AddValue(TokenType.KEYWORD_STATIC, 0.55f);
-            AddValue(TokenType.KEYWORD_PUBLIC, 0.55f);
-            AddValue(TokenType.KEYWORD_PRIVATE, 0.55f);
-            AddValue(TokenType.KEYWORD_PROTECTED, 0.55f);
-            AddValue(TokenType.KEYWORD_ABSTRACT, 0.55f);
-            AddValue(TokenType.KEYWORD_FINAL, 0.55f);
 
             // ==========================================
             // LOW-MEDIUM ELECTRONEGATIVITY (0.2-0.4)
@@ -162,7 +143,6 @@ namespace DigitalBiochemicalSimulator.Chemistry
             AddValue(TokenType.FLOAT_LITERAL, 0.30f);
             AddValue(TokenType.STRING_LITERAL, 0.30f);
             AddValue(TokenType.BOOLEAN_LITERAL, 0.30f);
-            AddValue(TokenType.CHAR_LITERAL, 0.30f);
             AddValue(TokenType.KEYWORD_NULL, 0.25f);
             AddValue(TokenType.KEYWORD_TRUE, 0.30f);
             AddValue(TokenType.KEYWORD_FALSE, 0.30f);
@@ -180,8 +160,9 @@ namespace DigitalBiochemicalSimulator.Chemistry
             AddValue(TokenType.QUESTION_MARK, 0.50f); // Ternary operator
 
             // Comments (if tokens)
-            AddValue(TokenType.COMMENT_LINE, 0.05f);
-            AddValue(TokenType.COMMENT_BLOCK, 0.05f);
+            AddValue(TokenType.COMMENT_SINGLE, 0.05f);
+            AddValue(TokenType.COMMENT_MULTI_START, 0.05f);
+            AddValue(TokenType.COMMENT_MULTI_END, 0.05f);
 
             // ==========================================
             // VERY HIGH ELECTRONEGATIVITY (0.9-1.0)
@@ -194,24 +175,7 @@ namespace DigitalBiochemicalSimulator.Chemistry
             AddValue(TokenType.BRACKET_OPEN, 0.95f);
             AddValue(TokenType.BRACKET_CLOSE, 0.95f);
 
-            // Exception Handling - high importance
-            AddValue(TokenType.KEYWORD_TRY, 0.85f);
-            AddValue(TokenType.KEYWORD_CATCH, 0.85f);
-            AddValue(TokenType.KEYWORD_FINALLY, 0.85f);
-            AddValue(TokenType.KEYWORD_THROW, 0.80f);
-
-            // Async/Concurrency - high importance
-            AddValue(TokenType.KEYWORD_ASYNC, 0.75f);
-            AddValue(TokenType.KEYWORD_AWAIT, 0.75f);
-            AddValue(TokenType.KEYWORD_YIELD, 0.70f);
-
-            // Import/Export - high importance
-            AddValue(TokenType.KEYWORD_IMPORT, 0.80f);
-            AddValue(TokenType.KEYWORD_EXPORT, 0.80f);
-            AddValue(TokenType.KEYWORD_FROM, 0.75f);
-
             // Special
-            AddValue(TokenType.UNKNOWN, 0.01f);
             AddValue(TokenType.WHITESPACE, 0.01f);
             AddValue(TokenType.NEWLINE, 0.01f);
             AddValue(TokenType.EOF, 0.01f);

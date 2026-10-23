@@ -55,7 +55,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             registry.RegisterChain(chain);
 
             // Act
-            registry.UnregisterChain(chain.Id);
+            registry.RemoveChain(chain.Id);
 
             // Assert
             var retrievedChain = registry.GetChain(chain.Id);
@@ -101,8 +101,8 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
         {
             // Arrange
             var registry = CreateRegistry();
-            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero);
-            var chain = new TokenChain(token) { Id = 1 };
+            var token = new Token(1, TokenType.INTEGER_LITERAL, "42", Vector3Int.Zero) { Energy = 100 };
+            var chain = new TokenChain(token) { Id = 1, StabilityScore = 0.0f };
             registry.RegisterChain(chain);
 
             // Act
@@ -112,6 +112,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             var retrievedChain = registry.GetChain(chain.Id);
             // Stability should have been calculated (exact value depends on calculator)
             Assert.NotNull(retrievedChain);
+            Assert.True(retrievedChain.StabilityScore > 0.0f);
         }
 
         [Fact]
@@ -207,7 +208,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             Assert.NotNull(stats);
             Assert.Equal(2, stats.TotalChains);
             Assert.Equal(8, stats.TotalTokensInChains); // 3 + 5
-            Assert.Equal(4.0, stats.AverageChainLength); // (3 + 5) / 2
+            Assert.Equal(4.0, stats.AverageLength); // (3 + 5) / 2
             Assert.Equal(5, stats.LongestChainLength);
         }
 
@@ -250,6 +251,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
 
             // Assert
             var retrieved = registry.GetChain(1);
+            Assert.NotNull(retrieved);
             Assert.Equal(2, retrieved.Length); // Second chain replaced first
         }
     }

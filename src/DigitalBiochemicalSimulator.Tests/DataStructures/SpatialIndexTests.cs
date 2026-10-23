@@ -11,10 +11,8 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void SpatialIndex_Constructor_InitializesCorrectly()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-
             // Act
-            var index = new SpatialIndex(bounds, capacity: 10);
+            var index = new SpatialIndex(100, 100, 100, maxTokensPerNode: 10);
 
             // Assert
             Assert.NotNull(index);
@@ -24,12 +22,11 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Insert_Token_AddsToIndex()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds, capacity: 10);
+            var index = new SpatialIndex(100, 100, 100, maxTokensPerNode: 10);
             var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(50, 50, 50));
 
             // Act
-            index.Insert(token);
+            index.AddToken(token);
 
             // Assert
             var nearby = index.FindTokensInRange(new Vector3Int(50, 50, 50), 5);
@@ -40,16 +37,15 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void FindTokensInRange_ReturnsTokensWithinRadius()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "1", new Vector3Int(50, 50, 50));
             var token2 = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(52, 50, 50));
             var token3 = new Token(3, TokenType.INTEGER_LITERAL, "3", new Vector3Int(60, 50, 50));
 
-            index.Insert(token1);
-            index.Insert(token2);
-            index.Insert(token3);
+            index.AddToken(token1);
+            index.AddToken(token2);
+            index.AddToken(token3);
 
             // Act
             var nearby = index.FindTokensInRange(new Vector3Int(50, 50, 50), 5);
@@ -65,8 +61,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void FindTokensInRange_EmptyIndex_ReturnsEmpty()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             // Act
             var nearby = index.FindTokensInRange(new Vector3Int(50, 50, 50), 10);
@@ -79,14 +74,13 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void FindPotentialBondingPartners_ExcludesSelf()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "1", new Vector3Int(50, 50, 50));
             var token2 = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(52, 50, 50));
 
-            index.Insert(token1);
-            index.Insert(token2);
+            index.AddToken(token1);
+            index.AddToken(token2);
 
             // Act
             var partners = index.FindPotentialBondingPartners(token1, 5);
@@ -101,14 +95,13 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void FindPotentialBondingPartners_ExcludesInactiveTokens()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "1", new Vector3Int(50, 50, 50));
             var token2 = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(52, 50, 50)) { IsActive = false };
 
-            index.Insert(token1);
-            index.Insert(token2);
+            index.AddToken(token1);
+            index.AddToken(token2);
 
             // Act
             var partners = index.FindPotentialBondingPartners(token1, 5);
@@ -121,14 +114,13 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Remove_Token_RemovesFromIndex()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
             var token = new Token(1, TokenType.INTEGER_LITERAL, "42", new Vector3Int(50, 50, 50));
 
-            index.Insert(token);
+            index.AddToken(token);
 
             // Act
-            index.Remove(token);
+            index.RemoveToken(token);
             var nearby = index.FindTokensInRange(new Vector3Int(50, 50, 50), 5);
 
             // Assert
@@ -139,8 +131,7 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Rebuild_ReconstructsIndex()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             var tokens = new[]
             {
@@ -151,14 +142,14 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
 
             foreach (var token in tokens)
             {
-                index.Insert(token);
+                index.AddToken(token);
             }
 
             // Modify token positions
             tokens[0].Position = new Vector3Int(50, 50, 50);
 
             // Act
-            index.Rebuild(tokens);
+            index.IndexTokens(tokens);
 
             // Assert
             var nearby = index.FindTokensInRange(new Vector3Int(50, 50, 50), 5);
@@ -169,14 +160,13 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void Clear_RemovesAllTokens()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "1", new Vector3Int(50, 50, 50));
             var token2 = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(60, 60, 60));
 
-            index.Insert(token1);
-            index.Insert(token2);
+            index.AddToken(token1);
+            index.AddToken(token2);
 
             // Act
             index.Clear();
@@ -190,17 +180,16 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void FindNearestNeighbors_ReturnsClosestTokens()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             var center = new Vector3Int(50, 50, 50);
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "1", new Vector3Int(52, 50, 50)); // Distance: 2
             var token2 = new Token(2, TokenType.INTEGER_LITERAL, "2", new Vector3Int(55, 50, 50)); // Distance: 5
             var token3 = new Token(3, TokenType.INTEGER_LITERAL, "3", new Vector3Int(60, 50, 50)); // Distance: 10
 
-            index.Insert(token1);
-            index.Insert(token2);
-            index.Insert(token3);
+            index.AddToken(token1);
+            index.AddToken(token2);
+            index.AddToken(token3);
 
             // Act
             var nearest = index.FindNearestNeighbors(center, k: 2);
@@ -215,15 +204,14 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         public void AutoRebuild_TriggersAfterThresholdUpdates()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds, rebuildThreshold: 10);
+            var index = new SpatialIndex(100, 100, 100, rebuildThreshold: 10);
 
             // Act - Add more tokens than threshold
             for (int i = 0; i < 15; i++)
             {
                 var token = new Token(i, TokenType.INTEGER_LITERAL, i.ToString(),
                     new Vector3Int(i * 5, i * 5, i * 5));
-                index.Insert(token);
+                index.AddToken(token);
             }
 
             // Assert - Index should still work correctly after auto-rebuild
@@ -232,11 +220,10 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
         }
 
         [Fact]
-        public void GetTokenClusters_GroupsNearbyTokens()
+        public void FindClusters_GroupsNearbyTokens()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(200, 200, 200));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(200, 200, 200);
 
             // Create two clusters
             var cluster1Tokens = new[]
@@ -254,37 +241,35 @@ namespace DigitalBiochemicalSimulator.Tests.DataStructures
 
             foreach (var token in cluster1Tokens.Concat(cluster2Tokens))
             {
-                index.Insert(token);
+                index.AddToken(token);
             }
 
             // Act
-            var clusters = index.GetTokenClusters(clusterRadius: 5);
+            var clusters = index.FindClusters(cluster1Tokens.Concat(cluster2Tokens).ToList(), clusterRadius: 5);
 
             // Assert
             Assert.True(clusters.Count >= 2); // At least 2 clusters
         }
 
         [Fact]
-        public void GetDensityMap_CalculatesDensity()
+        public void CalculateDensity_CalculatesDensity()
         {
             // Arrange
-            var bounds = new BoundingBox(new Vector3Int(0, 0, 0), new Vector3Int(100, 100, 100));
-            var index = new SpatialIndex(bounds);
+            var index = new SpatialIndex(100, 100, 100);
 
             // Add tokens in one area
             for (int i = 0; i < 10; i++)
             {
                 var token = new Token(i, TokenType.INTEGER_LITERAL, i.ToString(),
                     new Vector3Int(50 + i, 50, 50));
-                index.Insert(token);
+                index.AddToken(token);
             }
 
             // Act
-            var densityMap = index.GetDensityMap(cellSize: 10);
+            float density = index.CalculateDensity(new Vector3Int(55, 50, 50), 10);
 
             // Assert
-            Assert.NotNull(densityMap);
-            Assert.NotEmpty(densityMap);
+            Assert.True(density > 0);
         }
     }
 }

@@ -1,4 +1,5 @@
 using Xunit;
+using DigitalBiochemicalSimulator.Tests.TestHelpers;
 using DigitalBiochemicalSimulator.Core;
 using DigitalBiochemicalSimulator.Grammar;
 using DigitalBiochemicalSimulator.DataStructures;
@@ -19,9 +20,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenPlus = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
             var token3 = new Token(3, TokenType.INTEGER_LITERAL, "3", Vector3Int.Zero);
 
-            var chain = new TokenChain(token5);
-            chain.AddToken(tokenPlus, atTail: true);
-            chain.AddToken(token3, atTail: true);
+            var chain = TestChains.Build(token5, tokenPlus, token3);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -42,9 +41,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenPlus = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
             var tokenTrue = new Token(3, TokenType.BOOLEAN_LITERAL, "true", Vector3Int.Zero);
 
-            var chain = new TokenChain(token5);
-            chain.AddToken(tokenPlus, atTail: true);
-            chain.AddToken(tokenTrue, atTail: true);
+            var chain = TestChains.Build(token5, tokenPlus, tokenTrue);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -66,9 +63,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenPlus = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
             var tokenPi = new Token(3, TokenType.FLOAT_LITERAL, "3.14", Vector3Int.Zero);
 
-            var chain = new TokenChain(token5);
-            chain.AddToken(tokenPlus, atTail: true);
-            chain.AddToken(tokenPi, atTail: true);
+            var chain = TestChains.Build(token5, tokenPlus, tokenPi);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -89,10 +84,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenMult = new Token(3, TokenType.OPERATOR_MULTIPLY, "*", Vector3Int.Zero);
             var token3 = new Token(4, TokenType.INTEGER_LITERAL, "3", Vector3Int.Zero);
 
-            var chain = new TokenChain(token5);
-            chain.AddToken(tokenPlus, atTail: true);
-            chain.AddToken(tokenMult, atTail: true);
-            chain.AddToken(token3, atTail: true);
+            var chain = TestChains.Build(token5, tokenPlus, tokenMult, token3);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -109,15 +101,12 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var validator = new SemanticValidator();
 
             // Create "int x = 5"
-            var tokenInt = new Token(1, TokenType.KEYWORD_INT, "int", Vector3Int.Zero);
+            var tokenInt = new Token(1, TokenType.TYPE_INT, "int", Vector3Int.Zero);
             var tokenX = new Token(2, TokenType.IDENTIFIER, "x", Vector3Int.Zero);
             var tokenEq = new Token(3, TokenType.OPERATOR_ASSIGN, "=", Vector3Int.Zero);
             var token5 = new Token(4, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
 
-            var chain = new TokenChain(tokenInt);
-            chain.AddToken(tokenX, atTail: true);
-            chain.AddToken(tokenEq, atTail: true);
-            chain.AddToken(token5, atTail: true);
+            var chain = TestChains.Build(tokenInt, tokenX, tokenEq, token5);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -137,9 +126,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenPlus = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
             var token5 = new Token(3, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
 
-            var chain = new TokenChain(tokenX);
-            chain.AddToken(tokenPlus, atTail: true);
-            chain.AddToken(token5, atTail: true);
+            var chain = TestChains.Build(tokenX, tokenPlus, token5);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -160,9 +147,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenAnd = new Token(2, TokenType.OPERATOR_AND, "&&", Vector3Int.Zero);
             var tokenFalse = new Token(3, TokenType.BOOLEAN_LITERAL, "false", Vector3Int.Zero);
 
-            var chain = new TokenChain(tokenTrue);
-            chain.AddToken(tokenAnd, atTail: true);
-            chain.AddToken(tokenFalse, atTail: true);
+            var chain = TestChains.Build(tokenTrue, tokenAnd, tokenFalse);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -182,9 +167,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenAnd = new Token(2, TokenType.OPERATOR_AND, "&&", Vector3Int.Zero);
             var token3 = new Token(3, TokenType.INTEGER_LITERAL, "3", Vector3Int.Zero);
 
-            var chain = new TokenChain(token5);
-            chain.AddToken(tokenAnd, atTail: true);
-            chain.AddToken(token3, atTail: true);
+            var chain = TestChains.Build(token5, tokenAnd, token3);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -271,14 +254,11 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
 
             // Create "if ( true )"
             var tokenIf = new Token(1, TokenType.KEYWORD_IF, "if", Vector3Int.Zero);
-            var tokenLParen = new Token(2, TokenType.LPAREN, "(", Vector3Int.Zero);
+            var tokenLParen = new Token(2, TokenType.PAREN_OPEN, "(", Vector3Int.Zero);
             var tokenTrue = new Token(3, TokenType.BOOLEAN_LITERAL, "true", Vector3Int.Zero);
-            var tokenRParen = new Token(4, TokenType.RPAREN, ")", Vector3Int.Zero);
+            var tokenRParen = new Token(4, TokenType.PAREN_CLOSE, ")", Vector3Int.Zero);
 
-            var chain = new TokenChain(tokenIf);
-            chain.AddToken(tokenLParen, atTail: true);
-            chain.AddToken(tokenTrue, atTail: true);
-            chain.AddToken(tokenRParen, atTail: true);
+            var chain = TestChains.Build(tokenIf, tokenLParen, tokenTrue, tokenRParen);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -297,8 +277,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenIf = new Token(1, TokenType.KEYWORD_IF, "if", Vector3Int.Zero);
             var tokenTrue = new Token(2, TokenType.BOOLEAN_LITERAL, "true", Vector3Int.Zero);
 
-            var chain = new TokenChain(tokenIf);
-            chain.AddToken(tokenTrue, atTail: true);
+            var chain = TestChains.Build(tokenIf, tokenTrue);
 
             // Act
             var result = validator.ValidateChain(chain);
@@ -318,8 +297,7 @@ namespace DigitalBiochemicalSimulator.Tests.Grammar
             var tokenX = new Token(1, TokenType.IDENTIFIER, "x", Vector3Int.Zero);
             var tokenPlus = new Token(2, TokenType.OPERATOR_PLUS, "+", Vector3Int.Zero);
 
-            var chain = new TokenChain(tokenX);
-            chain.AddToken(tokenPlus, atTail: true);
+            var chain = TestChains.Build(tokenX, tokenPlus);
 
             // Act
             var result = validator.ValidateChain(chain);

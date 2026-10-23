@@ -64,7 +64,7 @@ namespace DigitalBiochemicalSimulator.Grammar
             }
 
             // Step 3: Grammar validation (from chain's built-in validation)
-            var grammarResult = chain.Validate();
+            var grammarResult = chain.ValidateChain();
             result.GrammarValid = grammarResult.IsValid;
             result.GrammarErrors = grammarResult.Errors;
 
@@ -152,7 +152,7 @@ namespace DigitalBiochemicalSimulator.Grammar
     {
         public long ChainId { get; set; }
         public int Length { get; set; }
-        public string CodeString { get; set; }
+        public string CodeString { get; set; } = string.Empty;
 
         // Grammar validation
         public bool GrammarValid { get; set; }
@@ -160,13 +160,13 @@ namespace DigitalBiochemicalSimulator.Grammar
 
         // AST analysis
         public bool ASTBuilt { get; set; }
-        public ASTNode AST { get; set; }
-        public string ASTRepresentation { get; set; }
-        public string ASTError { get; set; }
+        public ASTNode? AST { get; set; }
+        public string? ASTRepresentation { get; set; }
+        public string? ASTError { get; set; }
 
         // Semantic validation
         public bool SemanticValid { get; set; }
-        public SemanticValidationResult SemanticResult { get; set; }
+        public SemanticValidationResult? SemanticResult { get; set; }
 
         // Overall
         public bool IsFullyValid { get; set; }

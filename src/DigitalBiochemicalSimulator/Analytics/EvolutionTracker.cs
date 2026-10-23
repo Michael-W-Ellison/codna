@@ -15,7 +15,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         private readonly Dictionary<long, ChainLineage> _lineages;
         private readonly List<ChainSnapshot> _history;
         private readonly PatternRecognizer _patternRecognizer;
-        private long _generationCounter;
+        private long _deepestGeneration;
         private readonly object _trackerLock = new object();
 
         public int LineageCount => _lineages.Count;
@@ -26,28 +26,37 @@ namespace DigitalBiochemicalSimulator.Analytics
             _lineages = new Dictionary<long, ChainLineage>();
             _history = new List<ChainSnapshot>();
             _patternRecognizer = new PatternRecognizer();
-            _generationCounter = 0;
+            _deepestGeneration = 0;
         }
 
         /// <summary>
-        /// Records a chain formation event
+        /// Records a chain formation event. A chain copied from another chain (replication)
+        /// records that chain as its parent and is one generation deeper; a chain assembled
+        /// from free tokens is generation 0.
         /// </summary>
-        public void RecordChainFormation(TokenChain chain, long tick)
+        public void RecordChainFormation(TokenChain chain, long tick, long? parentChainId = null)
         {
             if (chain == null || chain.Length < 2)
                 return;
 
             lock (_trackerLock)
             {
+                long generation = 0;
+                if (parentChainId.HasValue && _lineages.TryGetValue(parentChainId.Value, out var parent))
+                    generation = parent.Generation + 1;
+                _deepestGeneration = Math.Max(_deepestGeneration, generation);
+
                 var lineage = new ChainLineage
                 {
                     ChainId = chain.Id,
-                    Generation = _generationCounter++,
+                    Generation = generation,
                     BirthTick = tick,
                     Pattern = ExtractPattern(chain),
                     Length = chain.Length,
+                    PeakLength = chain.Length,
                     InitialStability = chain.StabilityScore,
-                    ParentIds = new List<long>() // Will be populated if chain merges
+                    PeakStability = chain.StabilityScore,
+                    ParentIds = parentChainId.HasValue ? new List<long> { parentChainId.Value } : new List<long>()
                 };
 
                 _lineages[chain.Id] = lineage;
@@ -92,7 +101,6 @@ namespace DigitalBiochemicalSimulator.Analytics
                 // Update lineage if exists
                 if (_lineages.TryGetValue(chain.Id, out var lineage))
                 {
-                    lineage.DeathTick = tick; // Update last seen
                     lineage.PeakStability = Math.Max(lineage.PeakStability, chain.StabilityScore);
                     lineage.PeakLength = Math.Max(lineage.PeakLength, chain.Length);
                 }
@@ -189,7 +197,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         /// <summary>
         /// Gets the lineage of a specific chain
         /// </summary>
-        public ChainLineage GetLineage(long chainId)
+        public ChainLineage? GetLineage(long chainId)
         {
             lock (_trackerLock)
             {
@@ -278,7 +286,8 @@ namespace DigitalBiochemicalSimulator.Analytics
                     TotalLineages = _lineages.Count,
                     ActiveLineages = activeLineages.Count,
                     ExtinctLineages = deadLineages.Count,
-                    TotalGenerations = _generationCounter,
+                    TotalGenerations = _deepestGeneration,
+                    ReplicatedLineages = _lineages.Values.Count(l => l.ParentIds.Count > 0),
                     AverageLifespan = deadLineages.Any()
                         ? deadLineages.Average(l => l.Lifespan)
                         : 0,
@@ -289,8 +298,8 @@ namespace DigitalBiochemicalSimulator.Analytics
                         ? _lineages.Values.Max(l => l.PeakStability)
                         : 0,
                     UniquePatterns = _history
-                        .Where(s => s?.Pattern?.Hash != null)
-                        .Select(s => s.Pattern.Hash)
+                        .Select(s => s?.Pattern?.Hash)
+                        .Where(hash => hash != null)
                         .Distinct()
                         .Count()
                 };
@@ -312,7 +321,7 @@ namespace DigitalBiochemicalSimulator.Analytics
                 // Data rows
                 foreach (var snapshot in _history.OrderBy(s => s.Tick))
                 {
-                    var patternHash = snapshot?.Pattern?.Hash ?? "";
+                    var patternHash = snapshot.Pattern?.Hash ?? "";
                     csv.AppendLine($"{snapshot.ChainId},{snapshot.Tick},{snapshot.Length}," +
                                  $"{snapshot.Stability:F2},{snapshot.Fitness:F2}," +
                                  $"\"{patternHash}\"");
@@ -331,7 +340,7 @@ namespace DigitalBiochemicalSimulator.Analytics
             {
                 _lineages.Clear();
                 _history.Clear();
-                _generationCounter = 0;
+                _deepestGeneration = 0;
                 _patternRecognizer.Clear();
             }
         }
@@ -351,9 +360,9 @@ namespace DigitalBiochemicalSimulator.Analytics
         public int PeakLength { get; set; }
         public float InitialStability { get; set; }
         public float PeakStability { get; set; }
-        public ChainPattern Pattern { get; set; }
-        public List<long> ParentIds { get; set; }
-        public string DeathReason { get; set; }
+        public ChainPattern? Pattern { get; set; }
+        public List<long> ParentIds { get; set; } = new();
+        public string? DeathReason { get; set; }
     }
 
     /// <summary>
@@ -365,7 +374,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         public long Tick { get; set; }
         public int Length { get; set; }
         public float Stability { get; set; }
-        public ChainPattern Pattern { get; set; }
+        public ChainPattern? Pattern { get; set; }
         public double Fitness { get; set; }
     }
 
@@ -378,7 +387,7 @@ namespace DigitalBiochemicalSimulator.Analytics
         public List<TokenType> TokenTypes { get; set; }
         public List<string> TokenValues { get; set; }
         public int UniqueTokenTypes { get; set; }
-        public string Hash { get; set; }
+        public string? Hash { get; set; }
 
         public ChainPattern()
         {
@@ -392,7 +401,7 @@ namespace DigitalBiochemicalSimulator.Analytics
     /// </summary>
     public class PatternFrequency
     {
-        public ChainPattern Pattern { get; set; }
+        public ChainPattern? Pattern { get; set; }
         public int Count { get; set; }
         public double TotalFitness { get; set; }
         public double AverageFitness { get; set; }
@@ -406,7 +415,8 @@ namespace DigitalBiochemicalSimulator.Analytics
         public int TotalLineages { get; set; }
         public int ActiveLineages { get; set; }
         public int ExtinctLineages { get; set; }
-        public long TotalGenerations { get; set; }
+        public long TotalGenerations { get; set; }   // deepest generation reached by replication (0 = none)
+        public int ReplicatedLineages { get; set; }  // lineages that were copied from a parent chain
         public double AverageLifespan { get; set; }
         public int LongestLineage { get; set; }
         public float HighestStability { get; set; }

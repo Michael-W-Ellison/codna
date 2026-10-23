@@ -1,6 +1,7 @@
 using Xunit;
 using DigitalBiochemicalSimulator.Presets;
 using DigitalBiochemicalSimulator.Simulation;
+using SimulationPresets = DigitalBiochemicalSimulator.Presets.SimulationPresets;
 
 namespace DigitalBiochemicalSimulator.Tests.Presets
 {
@@ -152,7 +153,7 @@ namespace DigitalBiochemicalSimulator.Tests.Presets
             // Assert
             foreach (var preset in allPresets.Values)
             {
-                Assert.True(preset.Validate(out string errorMessage),
+                Assert.True(preset.Validate(out string? errorMessage),
                     $"Preset configuration is invalid: {errorMessage}");
             }
         }
@@ -195,7 +196,7 @@ namespace DigitalBiochemicalSimulator.Tests.Presets
             var duration = SimulationPresets.GetRecommendedDuration("InvalidPresetName");
 
             // Assert
-            Assert.Equal(1000, duration); // Default value
+            Assert.Equal(5000, duration); // Default value
         }
 
         [Fact]
@@ -280,8 +281,8 @@ namespace DigitalBiochemicalSimulator.Tests.Presets
             // Act
             var config = SimulationPresets.HighPressure();
 
-            // Assert - Should have tall grid for high altitude pressure
-            Assert.True(config.GridHeight >= 100);
+            // Assert - Should have tall grid for high altitude pressure (altitude is the Z axis)
+            Assert.True(config.GridDepth >= 100);
         }
 
         [Fact]

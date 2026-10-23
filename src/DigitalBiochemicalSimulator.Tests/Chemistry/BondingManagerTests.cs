@@ -55,7 +55,7 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             var token1 = new Token(1, TokenType.INTEGER_LITERAL, "5", Vector3Int.Zero);
 
             // Act
-            bool result = manager.AttemptBond(token1, null, currentTick: 0);
+            bool result = manager.AttemptBond(token1, null!, currentTick: 0);
 
             // Assert
             Assert.False(result);
@@ -238,7 +238,9 @@ namespace DigitalBiochemicalSimulator.Tests.Chemistry
             grid.AddToken(token2);
 
             // Act
-            var result = manager.ProcessCellBonding(cell, currentTick: 0);
+            var cellProcessor = new CellProcessor(manager, new RepulsionHandler(grid, rulesEngine), config);
+            Assert.NotNull(cell);
+            var result = cellProcessor.ProcessCell(cell, currentTick: 0);
 
             // Assert
             Assert.NotNull(result);

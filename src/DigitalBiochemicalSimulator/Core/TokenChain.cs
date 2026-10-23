@@ -11,15 +11,17 @@ namespace DigitalBiochemicalSimulator.Core
     public class TokenChain
     {
         public long Id { get; set; }
-        public Token Head { get; set; }
-        public Token Tail { get; set; }
+        public Token? Head { get; set; }
+        public Token? Tail { get; set; }
         public int Length { get; set; }
         public int TotalMass { get; set; }
         public int TotalEnergy { get; set; }
         public float StabilityScore { get; set; }
         public long LastModifiedTick { get; set; }
-        public long LastModifiedAt { get; set; } // Alias for compatibility
+        public long LastModifiedAt { get => LastModifiedTick; set => LastModifiedTick = value; } // Alias for compatibility
         public long CreatedAt { get; set; }
+        public long? LastValidatedTick { get; set; } // null until the engine first validates the chain
+        public bool PassedValidation { get; set; }   // passed the engine's syntax and semantic checks when last validated
         public bool IsValid { get; set; }
         public BondType BondType { get; set; }
 
@@ -81,10 +83,11 @@ namespace DigitalBiochemicalSimulator.Core
             // Validate bonding compatibility if adding to existing chain
             if (Length > 0)
             {
-                Token adjacentToken = atTail ? Tail : Head;
+                Token? adjacentToken = atTail ? Tail : Head;
 
                 // Check if tokens are actually bonded
-                if (!adjacentToken.BondedTokens.Contains(token) &&
+                if (adjacentToken == null ||
+                    !adjacentToken.BondedTokens.Contains(token) &&
                     !token.BondedTokens.Contains(adjacentToken))
                 {
                     return false; // Not bonded, cannot add
@@ -432,54 +435,174 @@ namespace DigitalBiochemicalSimulator.Core
         /// </summary>
         private bool CheckExpressionStructure()
         {
-            // Simple check: operators should be between operands
+            // State machine over the token sequence: operands and binary operators must alternate,
+            // and the chain must end on a complete expression or statement
             bool expectOperand = true;
 
-            foreach (var token in Tokens)
+            for (int i = 0; i < Tokens.Count; i++)
             {
-                bool isOperand = token.Type == TokenType.INTEGER_LITERAL ||
-                                token.Type == TokenType.FLOAT_LITERAL ||
-                                token.Type == TokenType.IDENTIFIER;
+                var type = Tokens[i].Type;
+                var next = i + 1 < Tokens.Count ? Tokens[i + 1].Type : (TokenType?)null;
+                var previous = i > 0 ? Tokens[i - 1].Type : (TokenType?)null;
+                var beforePrevious = i > 1 ? Tokens[i - 2].Type : (TokenType?)null;
+                bool atStatementStart = IsStatementBoundary(previous);
 
-                bool isOperator = token.Type == TokenType.OPERATOR_PLUS ||
-                                 token.Type == TokenType.OPERATOR_MINUS ||
-                                 token.Type == TokenType.OPERATOR_MULTIPLY ||
-                                 token.Type == TokenType.OPERATOR_DIVIDE;
-
-                if (expectOperand && !isOperand)
+                if (IsOperandType(type))
                 {
-                    // Allow parentheses and keywords
-                    if (token.Type != TokenType.LPAREN &&
-                        token.Type != TokenType.KEYWORD_IF &&
-                        token.Type != TokenType.KEYWORD_WHILE)
-                    {
+                    if (!expectOperand)
                         return false;
-                    }
-                }
-                else if (!expectOperand && !isOperator)
-                {
-                    // Allow closing parentheses and semicolons
-                    if (token.Type != TokenType.RPAREN &&
-                        token.Type != TokenType.SEMICOLON)
-                    {
-                        return false;
-                    }
-                }
-
-                if (isOperand)
                     expectOperand = false;
-                if (isOperator)
+                }
+                else if (IsAssignmentOperatorType(type))
+                {
+                    // A single variable on the left, at the start of a statement or after its declaration:
+                    // "x = 5", "int x = 5"
+                    if (expectOperand || previous != TokenType.IDENTIFIER ||
+                        !(IsStatementBoundary(beforePrevious) || (beforePrevious.HasValue && IsDeclarationKeyword(beforePrevious.Value))))
+                        return false;
                     expectOperand = true;
+                }
+                else if (IsBinaryOperatorType(type))
+                {
+                    if (expectOperand)
+                        return false;
+                    expectOperand = true;
+                }
+                else if (type == TokenType.OPERATOR_NOT)
+                {
+                    // Unary prefix operator
+                    if (!expectOperand)
+                        return false;
+                }
+                else if (type == TokenType.PAREN_OPEN)
+                {
+                    if (!expectOperand)
+                        return false;
+                }
+                else if (type == TokenType.PAREN_CLOSE)
+                {
+                    if (expectOperand)
+                        return false;
+                }
+                else if (type == TokenType.KEYWORD_IF || type == TokenType.KEYWORD_WHILE)
+                {
+                    // Starts a statement and is followed by its condition in parentheses
+                    if (!atStatementStart || next != TokenType.PAREN_OPEN)
+                        return false;
+                }
+                else if (type == TokenType.KEYWORD_RETURN)
+                {
+                    if (!atStatementStart)
+                        return false;
+                }
+                else if (IsDeclarationKeyword(type))
+                {
+                    // Starts a statement and names a variable, which is then assigned or ends the
+                    // statement: "int x = 5", "int x ;"
+                    var afterName = i + 2 < Tokens.Count ? Tokens[i + 2].Type : (TokenType?)null;
+                    if (!atStatementStart || next != TokenType.IDENTIFIER ||
+                        !(afterName == null || afterName == TokenType.OPERATOR_ASSIGN || afterName == TokenType.SEMICOLON))
+                        return false;
+                }
+                else if (type == TokenType.SEMICOLON)
+                {
+                    // Ends a complete statement; a new statement may follow
+                    if (expectOperand)
+                        return false;
+                    expectOperand = true;
+                }
+                else if (type == TokenType.BRACE_OPEN)
+                {
+                    // A block follows a condition: "if ( x ) {"
+                    if (previous != TokenType.PAREN_CLOSE)
+                        return false;
+                    expectOperand = true;
+                }
+                else if (type == TokenType.BRACE_CLOSE)
+                {
+                    // Closes a block at a statement boundary
+                    if (previous != TokenType.SEMICOLON && previous != TokenType.BRACE_OPEN && previous != TokenType.BRACE_CLOSE)
+                        return false;
+                    expectOperand = true;
+                }
+                else
+                {
+                    // Tokens with no place in an expression or statement here
+                    return false;
+                }
             }
 
-            return true;
+            // Must not end waiting for an operand (e.g. "5 +" or "if (") unless a statement or block just ended
+            var last = Tokens[Tokens.Count - 1].Type;
+            return !expectOperand || last == TokenType.SEMICOLON || last == TokenType.BRACE_CLOSE;
+        }
+
+        /// <summary>
+        /// True at the start of the chain or after a token that ends a statement or opens/closes a block
+        /// </summary>
+        private static bool IsStatementBoundary(TokenType? previous)
+        {
+            return previous == null ||
+                   previous == TokenType.SEMICOLON ||
+                   previous == TokenType.BRACE_OPEN ||
+                   previous == TokenType.BRACE_CLOSE;
+        }
+
+        private static bool IsAssignmentOperatorType(TokenType type)
+        {
+            return type == TokenType.OPERATOR_ASSIGN ||
+                   type == TokenType.OPERATOR_PLUS_ASSIGN ||
+                   type == TokenType.OPERATOR_MINUS_ASSIGN ||
+                   type == TokenType.OPERATOR_MULTIPLY_ASSIGN ||
+                   type == TokenType.OPERATOR_DIVIDE_ASSIGN;
+        }
+
+        private static bool IsOperandType(TokenType type)
+        {
+            return type == TokenType.INTEGER_LITERAL ||
+                   type == TokenType.FLOAT_LITERAL ||
+                   type == TokenType.STRING_LITERAL ||
+                   type == TokenType.BOOLEAN_LITERAL ||
+                   type == TokenType.IDENTIFIER ||
+                   type == TokenType.KEYWORD_TRUE ||
+                   type == TokenType.KEYWORD_FALSE ||
+                   type == TokenType.KEYWORD_NULL;
+        }
+
+        private static bool IsBinaryOperatorType(TokenType type)
+        {
+            return type == TokenType.OPERATOR_PLUS ||
+                   type == TokenType.OPERATOR_MINUS ||
+                   type == TokenType.OPERATOR_MULTIPLY ||
+                   type == TokenType.OPERATOR_DIVIDE ||
+                   type == TokenType.OPERATOR_MODULO ||
+                   type == TokenType.OPERATOR_POWER ||
+                   type == TokenType.OPERATOR_EQUALS ||
+                   type == TokenType.OPERATOR_NOT_EQUALS ||
+                   type == TokenType.OPERATOR_LESS_THAN ||
+                   type == TokenType.OPERATOR_GREATER_THAN ||
+                   type == TokenType.OPERATOR_LESS_THAN_OR_EQUAL ||
+                   type == TokenType.OPERATOR_GREATER_THAN_OR_EQUAL ||
+                   type == TokenType.OPERATOR_AND ||
+                   type == TokenType.OPERATOR_OR;
+        }
+
+        private static bool IsDeclarationKeyword(TokenType type)
+        {
+            return type == TokenType.TYPE_INT ||
+                   type == TokenType.TYPE_FLOAT ||
+                   type == TokenType.TYPE_STRING ||
+                   type == TokenType.TYPE_BOOL ||
+                   type == TokenType.KEYWORD_VAR ||
+                   type == TokenType.KEYWORD_LET ||
+                   type == TokenType.KEYWORD_CONST;
         }
 
         /// <summary>
         /// Builds a simple Abstract Syntax Tree representation
         /// Returns root node of the AST
         /// </summary>
-        public ASTNode BuildAST()
+        public ASTNode? BuildAST()
         {
             if (Length == 0 || Tokens.Count == 0)
                 return null;
@@ -502,7 +625,7 @@ namespace DigitalBiochemicalSimulator.Core
         /// <summary>
         /// Recursively builds expression tree
         /// </summary>
-        private ASTNode BuildExpressionTree(int start, int end)
+        private ASTNode? BuildExpressionTree(int start, int end)
         {
             if (start > end)
                 return null;
@@ -522,8 +645,11 @@ namespace DigitalBiochemicalSimulator.Core
 
             if (operatorIndex == -1)
             {
-                // No operator found, might be a single value with parentheses
-                return BuildExpressionTree(start, end);
+                // No operator found: a parenthesized expression, otherwise not an expression
+                if (Tokens[start].Type == TokenType.PAREN_OPEN && Tokens[end].Type == TokenType.PAREN_CLOSE)
+                    return BuildExpressionTree(start + 1, end - 1);
+
+                return null;
             }
 
             var operatorToken = Tokens[operatorIndex];
@@ -609,7 +735,7 @@ namespace DigitalBiochemicalSimulator.Core
     public class ChainValidationResult
     {
         public bool IsValid { get; set; }
-        public List<string> Errors { get; set; }
+        public List<string> Errors { get; set; } = new();
 
         public override string ToString()
         {
@@ -626,10 +752,10 @@ namespace DigitalBiochemicalSimulator.Core
     public class ASTNode
     {
         public ASTNodeType NodeType { get; set; }
-        public Token Token { get; set; }
-        public string Value { get; set; }
-        public ASTNode Left { get; set; }
-        public ASTNode Right { get; set; }
+        public Token? Token { get; set; }
+        public string Value { get; set; } = string.Empty;
+        public ASTNode? Left { get; set; }
+        public ASTNode? Right { get; set; }
         public List<ASTNode> Children { get; set; }
 
         public ASTNode()
@@ -673,8 +799,8 @@ namespace DigitalBiochemicalSimulator.Core
         public bool SyntaxValid { get; set; }
         public bool SemanticValid { get; set; }
         public bool IsFullyValid { get; set; }
-        public ChainValidationResult SyntaxResult { get; set; }
-        public object SemanticResult { get; set; } // Will be SemanticValidationResult when available
+        public ChainValidationResult? SyntaxResult { get; set; }
+        public object? SemanticResult { get; set; } // Will be SemanticValidationResult when available
 
         public override string ToString()
         {
